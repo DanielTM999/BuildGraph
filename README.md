@@ -1,0 +1,560 @@
+# BuildGraph
+
+BuildGraph é uma ferramenta de build para projetos C e C++. Ela pode compilar projetos descritos
+por `Manifest.json`/`Manifest.xml` ou delegar o build para CMake, Meson e Make. Também oferece
+profiles incrementais, resolução de packages, tarefas de lifecycle e repositórios locais.
+
+## Conteúdo
+
+- [Download](#download)
+- [Uso da CLI](#uso)
+- [Modo interativo](#modo-interativo)
+- [Formatos de saída](#formatos-de-saída-e-exit-codes)
+- [Manifest](#manifest)
+- [Compiladores e caminhos](#compiladores-e-caminhos-dos-executáveis)
+- [Sistemas de build](#sistemas-de-build)
+- [Fontes, testes e artefatos](#fontes-testes-e-artefatos)
+- [Lifecycle e instalação](#lifecycle-e-instalação)
+- [Build a partir do código-fonte](#build-a-partir-do-código-fonte)
+- [Licença](#licença)
+
+## Download
+
+Os pacotes para Windows, Linux e macOS são gerados automaticamente a cada push e publicados em
+uma tag e uma GitHub Release. Baixe a versão mais recente na página de
+[Releases](../../releases/latest). Os pacotes produzidos por `jpackage` já incluem o runtime Java.
+
+Depois de extrair:
+
+- Windows: execute `BuildGraph\BuildGraph.exe`.
+- Linux: execute `BuildGraph/bin/BuildGraph`.
+- macOS: execute `BuildGraph.app/Contents/MacOS/BuildGraph`.
+
+O uber JAR também pode ser usado diretamente, desde que o Java 25 ou superior esteja instalado:
+
+```shell
+java -jar BuildGraph.jar --help
+```
+
+## Uso
+
+```text
+buildgraph [projectPath] [clean] [build] [test] [install] [refresh]
+           [--interactive] [-f raw|json|xml]
+           [-p profile] [-c compiler]
+           [--repo caminho] [--packages caminho]
+```
+
+Se `projectPath` não for informado, o diretório atual será usado. Sem uma fase explícita,
+BuildGraph executa `build`.
+
+| Comando/opção | Função |
+| --- | --- |
+| `clean` | Remove o diretório de build. |
+| `build` | Compila o projeto. |
+| `test` | Executa build e testes. |
+| `install` | Executa build e publica o projeto no primeiro repositório configurado. |
+| `refresh` | Resolve e materializa os packages do manifest. |
+| `--interactive` | Monitora o manifest e aceita comandos pela entrada padrão. |
+| `-p`, `--profile` | Profile usado somente quando o manifest não define `activeProfile`. |
+| `-c`, `--compiler` | Compilador usado somente quando o manifest não define compiladores. |
+| `--repo`, `--external` | Repositório adicional, depois dos repositórios do manifest. |
+| `--packages`, `--out` | Pasta local usada quando `packagesBase` não está configurado. |
+
+Exemplos:
+
+```shell
+# Build do projeto no diretório atual
+BuildGraph build
+
+# Limpa e depois compila outro projeto
+BuildGraph ../meu-projeto clean build
+
+# Usa saída JSON para integração com outra ferramenta
+BuildGraph . build --format json
+
+# Usa um profile da CLI somente se activeProfile não existir no manifest
+BuildGraph . test --profile debug
+
+# Usa um repositório adicional
+BuildGraph . refresh --repo D:/buildgraph-repository
+```
+
+As fases solicitadas são sempre ordenadas como `clean → build → test → install`, mesmo que tenham
+sido escritas em outra ordem. `test` e `install` também implicam `build`.
+
+## Modo interativo
+
+O modo interativo mantém o processo aberto, lê comandos pela entrada padrão e reutiliza o mesmo
+contexto de projeto. Ele é útil para IDEs, scripts persistentes e ciclos rápidos de desenvolvimento.
+
+```shell
+BuildGraph caminho/do/projeto --interactive
+```
+
+Também aceita as opções normais:
+
+```shell
+BuildGraph . --interactive --format json --profile debug --repo D:/packages
+```
+
+Ao iniciar, o modo interativo:
+
+1. Localiza e valida o manifest.
+2. Mostra os diagnósticos encontrados.
+3. Executa um `refresh` inicial dos packages.
+4. Começa a aguardar um comando por linha na entrada padrão.
+
+| Comando interativo | Comportamento |
+| --- | --- |
+| `build` | Recarrega a configuração efetiva e executa a fase de build. |
+| `clean` | Remove o diretório de build efetivo. |
+| `test` | Executa build e depois os testes. |
+| `install` | Executa build e publica o projeto no primeiro repositório. |
+| `refresh` | Resolve novamente os packages e atualiza a pasta materializada. |
+| `reload` | Relê o manifest e imprime seus diagnósticos, sem executar build. |
+| `status` | Mostra projeto, build system detectado e toolchain selecionada. |
+| `help` ou `?` | Mostra os comandos aceitos. |
+| `quit`, `exit` ou `q` | Encerra a sessão. |
+
+Linhas vazias são ignoradas. Um comando desconhecido gera um aviso e mantém a sessão aberta.
+
+O watcher monitora criação e alteração de `Manifest.json`/`Manifest.xml` diretamente na raiz do
+projeto, com debounce de 250 ms. Quando detecta uma mudança, relê os diagnósticos e executa
+`refresh`. Um manifest dentro de `.buildgraph` continua válido para build, mas atualmente não é
+observado automaticamente; nesse caso use `reload` e `refresh` após alterá-lo.
+
+Exemplo de controle por pipe no PowerShell:
+
+```powershell
+"status`nbuild`nquit" | .\BuildGraph\BuildGraph.exe . --interactive
+```
+
+Com `--format json` ou `--format xml`, todas as respostas continuam usando o formato escolhido, o
+que permite controlar a sessão por outro processo sem analisar texto colorido.
+
+## Formatos de saída e exit codes
+
+O formato padrão é `raw`, com severidade e cores ANSI. Para automação, use um formato estruturado:
+
+- `--format json`: um objeto JSON por linha (NDJSON), com `severity`, `message` e timestamp `ts`.
+- `--format xml`: um elemento `<log>` por linha, com atributos `severity` e `ts`. É um stream de
+  elementos, não um único documento XML com elemento raiz.
+
+Exemplo NDJSON:
+
+```json
+{"severity":"INFO","message":"Scanning for projects...","ts":1710000000000}
+```
+
+No modo de execução única, os exit codes principais são:
+
+| Código | Significado |
+| --- | --- |
+| `0` | Operação concluída com sucesso. |
+| `1` | Falha de refresh, build, teste, task ou instalação. |
+| `2` | Argumento, formato ou caminho de projeto inválido. |
+
+O modo interativo mantém a sessão após falhas de comandos individuais e encerra normalmente com
+`quit` ou fim da entrada padrão.
+
+## Manifest
+
+O manifest pode ficar na raiz ou em `.buildgraph`, nos formatos JSON ou XML. A ordem de procura é:
+
+1. `Manifest.json`
+2. `Manifest.xml`
+3. `.buildgraph/Manifest.json`
+4. `.buildgraph/Manifest.xml`
+
+Exemplo JSON:
+
+```json
+{
+  "id": "hello",
+  "name": "hello",
+  "version": "1.0.0",
+  "cStandard": "c17",
+  "cxxStandard": "c++20",
+  "cCompiler": "gcc",
+  "cxxCompiler": "g++",
+  "sourceFolders": ["src"],
+  "includePaths": ["include"],
+  "defines": ["APP_VERSION=1"],
+  "compileFlags": ["-Wall"],
+  "linkFlags": [],
+  "outputDir": "build",
+  "packagesBase": ".buildgraph/packages",
+  "repositories": ["../packages-repository"],
+  "properties": {
+    "generatedDir": "generated"
+  },
+  "env": {
+    "APP_ENV": "development"
+  },
+  "packages": [
+    {
+      "id": "fmt",
+      "version": "10.2.1",
+      "downloadUrl": "https://servidor.exemplo/fmt-10.2.1.zip"
+    }
+  ],
+  "activeProfile": "debug",
+  "profiles": {
+    "debug": {
+      "buildType": "Debug",
+      "defines": ["DEBUG=1"],
+      "packages": [
+        { "id": "test-lib", "version": "1.0.0" }
+      ]
+    },
+    "release": {
+      "buildType": "Release",
+      "defines": ["NDEBUG"]
+    }
+  }
+}
+```
+
+### Referência dos campos raiz
+
+Campos desconhecidos são ignorados. Listas e mapas nulos são tratados como vazios.
+
+| Campo | Tipo | Finalidade |
+| --- | --- | --- |
+| `id` | string | Identificador estável usado por packages e por `install`. |
+| `name` | string | Nome do projeto e nome-base do artefato. Se ausente, usa `id` ou a pasta do projeto. |
+| `version` | string | Versão publicada por `install`. |
+| `description` | string | Descrição propagada ao manifest da biblioteca instalada. |
+| `library` | boolean | Gera biblioteca compartilhada em vez de executável no build direto. |
+| `cCompiler` | string | Nome ou caminho do executável do compilador C. |
+| `cxxCompiler` | string | Nome ou caminho do executável do compilador C++. |
+| `cStandard` | string | Padrão C, por exemplo `c11`, `c17` ou `c23`. |
+| `cxxStandard` | string | Padrão C++, por exemplo `c++17`, `c++20` ou `c++23`. |
+| `compilerVersion` | string | Fallback legado para o padrão da linguagem; não é o caminho do compilador. |
+| `platform` | string | Target/triple de plataforma usado quando aplicável. |
+| `toolchainVersion` | string | Metadata de versão da toolchain disponível para profiles/placeholders. |
+| `sysroot` | string | Caminho passado como `--sysroot` em compiladores compatíveis. |
+| `sourceFolders` | string[] | Pastas de fontes C/C++ relativas ao projeto. |
+| `includePaths` | string[] | Pastas de headers adicionadas à linha de compilação. |
+| `defines` | string[] | Macros; `-D` ou `/D` é acrescentado quando necessário. |
+| `compileFlags` | string[] | Argumentos extras inseridos na compilação. |
+| `linkFlags` | string[] | Argumentos extras inseridos na etapa de link GCC/Clang. |
+| `libraryPaths` | string[] | Pastas de bibliotecas adicionadas com `-L`. |
+| `outputDir` | string | Pasta de build; o padrão é `<projeto>/build`. |
+| `packagesBase` | string | Pasta local onde dependências resolvidas são materializadas. |
+| `repositories` | string[] | Pastas pesquisadas para localizar packages. |
+| `packages` | object[] | Dependências do projeto. |
+| `activeProfile` | string | Nome do profile efetivo. |
+| `profiles` | object | Profiles disponíveis, indexados pelo nome. |
+| `properties` | object | Valores livres usados por placeholders. |
+| `env` | object | Variáveis de ambiente fornecidas a compiladores e tasks. |
+| `tasks` | object[] | Comandos associados às fases do lifecycle. |
+
+O mesmo modelo pode ser escrito em XML. Exemplo mínimo:
+
+```xml
+<Manifest>
+  <id>hello</id>
+  <name>hello</name>
+  <version>1.0.0</version>
+  <cCompiler>gcc</cCompiler>
+  <cxxCompiler>g++</cxxCompiler>
+  <sourceFolders>src</sourceFolders>
+  <includePaths>include</includePaths>
+  <repositories>../packages-repository</repositories>
+</Manifest>
+```
+
+Quando `outputDir` estiver ausente, `null`, vazio ou contiver apenas espaços, o build será gerado
+em `<projeto>/build`.
+
+### Precedência
+
+Configurações do manifest têm precedência sobre a CLI:
+
+1. Manifest raiz e profile ativo.
+2. Opção correspondente da CLI, usada como fallback.
+3. Valor padrão.
+
+Isso se aplica ao profile ativo, compiladores, `packagesBase` e repositórios. Formato de saída e
+fases do lifecycle continuam sendo controlados pela CLI.
+
+### Profiles incrementais
+
+Listas do profile são combinadas com as listas do manifest raiz. Por exemplo, se a raiz declara o
+package `A` e o profile declara `B`, o resultado será `A+B`. Se ambos declararem o mesmo `id`, a
+entrada do profile substitui a entrada raiz.
+
+Também podem ser usados `excludeIncludePaths`, `excludeSourceFolders` e `excludeDefines` para
+remover valores herdados. `env` e `properties` são combinados por chave, com o profile prevalecendo.
+
+Regras completas de composição:
+
+- Scalars como compilador, padrão, plataforma, `outputDir` e `packagesBase`: o valor não vazio do
+  profile substitui o valor raiz.
+- `library`: o valor do profile substitui a raiz somente quando declarado.
+- `sourceFolders`, `includePaths`, `defines`, `libraryPaths` e `repositories`: união ordenada sem
+  duplicatas.
+- `compileFlags` e `linkFlags`: concatenação raiz + profile, preservando inclusive duplicatas.
+- `packages`: união por `id`; uma entrada do profile substitui a raiz quando o `id` é igual.
+- `env` e `properties`: merge por chave; o profile prevalece.
+
+Campos aceitos dentro de um profile incluem `buildType`, `platform`, `toolchainVersion`,
+`compilerVersion`, `cStandard`, `cxxStandard`, `sysroot`, `cCompiler`, `cxxCompiler`, `outputDir`,
+`packagesBase`, `library`, as listas de compilação, `repositories`, `packages`, `env` e
+`properties`.
+
+### Repositórios
+
+`repositories` aceita uma ou mais pastas. Caminhos relativos são resolvidos a partir da raiz do
+projeto. A ordem final de resolução é:
+
+1. Repositórios do manifest raiz.
+2. Repositórios adicionados pelo profile ativo.
+3. Repositório informado por `--repo`.
+4. Repositório global `~/.buildgraph/repository`.
+
+A busca ocorre nessa ordem. Downloads e `install` escrevem no primeiro repositório. Os packages
+materializados para o projeto ficam em `packagesBase` ou, por padrão,
+`<projeto>/.buildgraph/packages`.
+
+Cada package declarado aceita:
+
+| Campo | Obrigatório | Finalidade |
+| --- | --- | --- |
+| `id` | sim | Identificador do package. |
+| `version` | sim para resolução atual | Versão exata pesquisada no repositório. |
+| `downloadUrl` | quando ainda não instalado | URL de um ZIP que será baixado e normalizado. |
+| `versionConstraint` | não | Metadata de restrição; a resolução atual utiliza `version`. |
+| `transitive` | não | Metadata de dependência transitiva; padrão `true`. |
+
+O layout do repositório é:
+
+```text
+<repo>/<id>/<version>/<variante>/
+├── Manifest.json
+└── lib/
+```
+
+Para resolução, BuildGraph procura primeiro uma variante específica solicitada internamente,
+depois `source` e por fim a primeira variante válida. Se o package não existir em nenhum
+repositório, `downloadUrl` deve apontar para um ZIP. O download é instalado no primeiro
+repositório e depois copiado para `packagesBase`.
+
+### Tarefas do lifecycle
+
+Tarefas podem executar comandos antes ou depois de `clean`, `build`, `test` e `install`:
+
+```json
+{
+  "tasks": [
+    {
+      "id": "generate",
+      "phase": "build",
+      "when": "before",
+      "order": 10,
+      "command": "generator",
+      "args": ["--output", "${properties.generatedDir}"],
+      "workingDir": "${project.dir}",
+      "failOnError": true
+    }
+  ]
+}
+```
+
+Uma tarefa pode declarar `dependsOn`, `env` e argumentos. `dependsOn` ordena tarefas da mesma
+fase/posição; `order` desempata as tarefas disponíveis. Um ciclo gera aviso e usa a ordem
+declarada. `failOnError` é `true` por padrão; quando `false`, o lifecycle continua após uma saída
+não zero.
+
+São suportados placeholders como
+`${project.dir}`, `${project.id}`, `${project.version}`, `${env.NOME}`,
+`${properties.chave}` e `${profile.current.propriedade}`.
+
+## Compiladores e caminhos dos executáveis
+
+`cCompiler`, `cxxCompiler` e `--compiler` representam o nome ou o caminho para o **executável/binário
+do compilador**, não a pasta que contém o compilador e não sua versão.
+
+### Configuração no manifest
+
+Use campos separados quando C e C++ possuem drivers diferentes:
+
+```json
+{
+  "cCompiler": "/usr/bin/gcc",
+  "cxxCompiler": "/usr/bin/g++"
+}
+```
+
+Windows com MinGW:
+
+```json
+{
+  "cCompiler": "C:/mingw64/bin/gcc.exe",
+  "cxxCompiler": "C:/mingw64/bin/g++.exe"
+}
+```
+
+Windows com LLVM:
+
+```json
+{
+  "cCompiler": "C:/Program Files/LLVM/bin/clang.exe",
+  "cxxCompiler": "C:/Program Files/LLVM/bin/clang++.exe"
+}
+```
+
+MSVC, após abrir um Developer Command Prompt ou carregar o ambiente do Visual Studio:
+
+```json
+{
+  "cCompiler": "cl.exe",
+  "cxxCompiler": "cl.exe"
+}
+```
+
+O valor pode ser:
+
+- Um comando disponível no `PATH`, como `gcc`, `g++`, `clang`, `clang++` ou `cl`.
+- Um caminho absoluto até o executável, opção recomendada para builds reproduzíveis.
+- Um caminho relativo; se não estiver no `PATH`, sua resolução dependerá do diretório do projeto e
+  do sistema operacional. Prefira caminho absoluto para evitar ambiguidade.
+
+Em JSON, use `/` nos caminhos Windows ou escape cada barra invertida:
+
+```json
+{
+  "cCompiler": "C:\\mingw64\\bin\\gcc.exe"
+}
+```
+
+Se apenas `cCompiler` for informado, ele também será usado como fallback para C++. Se apenas
+`cxxCompiler` for informado, ele será usado como fallback para C. Para projetos mistos, declare os
+dois campos explicitamente.
+
+Profiles podem selecionar uma toolchain diferente:
+
+```json
+{
+  "cCompiler": "/usr/bin/gcc",
+  "cxxCompiler": "/usr/bin/g++",
+  "profiles": {
+    "windows": {
+      "cCompiler": "C:/mingw64/bin/gcc.exe",
+      "cxxCompiler": "C:/mingw64/bin/g++.exe"
+    }
+  },
+  "activeProfile": "windows"
+}
+```
+
+### Configuração pela CLI
+
+`--compiler`/`-c` recebe um único executável e o utiliza como driver tanto para C quanto para C++:
+
+```shell
+BuildGraph . build --compiler clang++
+BuildGraph . build --compiler /opt/llvm/bin/clang++
+BuildGraph . build --compiler "C:\Program Files\LLVM\bin\clang++.exe"
+```
+
+Como a CLI aceita somente um driver, para projetos que precisam de `gcc` para C e `g++` para C++,
+configure `cCompiler` e `cxxCompiler` no manifest. Em projetos C++ usando GCC, prefira `g++` na CLI
+para que a biblioteca padrão C++ seja ligada corretamente.
+
+Os compiladores do manifest/profile têm precedência. `--compiler` só é usado quando nem
+`cCompiler` nem `cxxCompiler` estão definidos no manifest efetivo.
+
+`compilerVersion` não seleciona o executável. Ele funciona como fallback para o padrão de
+linguagem. Para evitar ambiguidade, prefira `cStandard` e `cxxStandard`:
+
+```json
+{
+  "cStandard": "c17",
+  "cxxStandard": "c++20"
+}
+```
+
+Sem configuração explícita, a detecção no `PATH` tenta, em ordem: Clang (`clang`/`clang++`),
+GCC/MinGW (`gcc`/`g++`) e MSVC (`cl`).
+
+> `cCompiler`, `cxxCompiler`, standards, flags e includes controlam o build direto pelo manifest.
+> Projetos CMake, Meson ou Make são delegados às respectivas ferramentas; configure o compilador
+> também pelo mecanismo do build system, como toolchain file, variáveis `CC`/`CXX` ou configuração
+> do próprio projeto.
+
+## Sistemas de build
+
+BuildGraph detecta o sistema usando o primeiro arquivo aplicável:
+
+| Prioridade | Arquivo | Build | Teste |
+| --- | --- | --- | --- |
+| 1 | `CMakeLists.txt` | `cmake -S . -B <buildDir>` e `cmake --build <buildDir>` | `ctest --test-dir <buildDir> --output-on-failure` |
+| 2 | `meson.build` | `meson setup <buildDir>` e `ninja -C <buildDir>` | `meson test -C <buildDir> --print-errorlogs` |
+| 3 | `Makefile`, `makefile` ou `GNUmakefile` | `make` | `make test` |
+| 4 | Manifest existente | Compilação direta C/C++ | Compilação e execução direta dos testes |
+| 5 | Nenhum dos anteriores | Compilação direta com descoberta automática de fontes | Teste direto |
+
+No CMake, o profile define `buildType` e o valor é enviado como `CMAKE_BUILD_TYPE`. Para Meson e
+Make, a configuração detalhada permanece sob controle do projeto externo.
+
+## Fontes, testes e artefatos
+
+No build direto, as fontes são procuradas da seguinte maneira:
+
+1. Pastas declaradas em `sourceFolders`.
+2. A pasta `src`, quando existe e `sourceFolders` está vazio.
+3. A raiz do projeto como último fallback.
+
+São reconhecidos arquivos `.c`, `.cpp`, `.cc`, `.cxx`, `.c++`, módulos C++ (`.cppm`, `.ixx`,
+`.mpp`, `.ccm`, `.cxxm`) e Objective-C/Objective-C++ (`.m`, `.mm`). Pastas de metadata e saída,
+como `.git`, `.buildgraph`, `.idea`, `build`, `out` e `cmake-build-*`, são ignoradas.
+
+Para testes diretos, fontes sob `test` e `tests` são compiladas junto com as fontes do projeto,
+exceto arquivos cujo nome começa com `main.`. O executável de teste é iniciado e seu exit code
+define o resultado. Se nenhuma fonte de teste existir, a fase termina com sucesso.
+
+No build direto, executáveis usam `name`, depois `id`, depois o nome da pasta do projeto. Bibliotecas
+com `library: true` geram `.dll` no Windows, `.dylib` no macOS e `.so` no Linux. Todos são escritos
+em `outputDir`, cujo padrão é `<projeto>/build`.
+
+Os modos são:
+
+- `Debug` por padrão: `-O0 -g` em GCC/Clang ou `/Od /Zi` em MSVC.
+- `Release` quando o profile define `buildType: "Release"`: `-O2` e `NDEBUG`.
+
+## Lifecycle e instalação
+
+Cada fase executa suas tasks `before`, depois a operação da fase e finalmente suas tasks `after`.
+Uma falha interrompe as fases seguintes.
+
+`clean` remove todo o diretório de build efetivo. `install` exige `id` ou `name` e também `version`.
+Ele publica os includes existentes e o artefato compilado em:
+
+```text
+<primeiro-repositório>/<id>/<version>/source/
+├── Manifest.json
+└── lib/
+```
+
+Esse package passa a poder ser resolvido por outros projetos que apontem para o mesmo repositório.
+
+## Build a partir do código-fonte
+
+Requisitos:
+
+- JDK 25 ou superior.
+- Maven.
+
+```shell
+mvn clean package
+java -jar target/BuildGraph.jar --help
+```
+
+O artefato `target/BuildGraph.jar` é um uber JAR executável com todas as dependências.
+
+## Licença
+
+BuildGraph é software de código aberto distribuído sob a [licença MIT](LICENSE).
