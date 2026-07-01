@@ -129,6 +129,7 @@ jobs:
         with:
           path: release-assets
           merge-multiple: true
+          skip-decompress: true
 
       - name: Create tag and permanent GitHub Release
         shell: bash
@@ -136,10 +137,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          shopt -s nullglob
-          assets=(release-assets/*)
+          mapfile -d '' assets < <(find release-assets -maxdepth 1 -type f -print0)
           if [ "${#assets[@]}" -ne 3 ]; then
             echo "Expected 3 native packages, found ${#assets[@]}" >&2
+            find release-assets -maxdepth 2 -print >&2
             exit 1
           fi
 
