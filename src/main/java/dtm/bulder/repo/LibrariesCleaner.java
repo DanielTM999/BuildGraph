@@ -1,5 +1,7 @@
 package dtm.bulder.repo;
 
+import dtm.bulder.manifest.model.PackageLock;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -27,7 +29,12 @@ public final class LibrariesCleaner {
         try (Stream<Path> children = Files.list(packagesDir)) {
             for (Path child : children.toList()) {
                 String name = child.getFileName().toString();
-                boolean orphan = name.startsWith(".tmp-") || !keep.contains(name);
+                if (keep.contains(name)) {
+                    continue;
+                }
+                // Nunca remove conteudo alheio: apenas temporarios interrompidos
+                // e pastas de fato materializadas pelo BuildGraph (com lock proprio).
+                boolean orphan = name.startsWith(".tmp-") || isManagedByBuildGraph(child);
                 if (!orphan) {
                     continue;
                 }
@@ -44,5 +51,18 @@ public final class LibrariesCleaner {
             return changed;
         }
         return changed;
+    }
+
+    private static boolean isManagedByBuildGraph(Path child) {
+        Path lock = child.resolve(PackageLock.FILE_NAME);
+        if (!Files.isRegularFile(lock)) {
+            return false;
+        }
+        try {
+            PackageLock parsed = RepoJson.read(lock, PackageLock.class);
+            return PackageLock.MANAGED_BY.equals(parsed.getManagedBy());
+        } catch (IOException e) {
+            return false;
+        }
     }
 }

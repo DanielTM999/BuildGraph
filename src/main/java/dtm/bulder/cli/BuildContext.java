@@ -148,7 +148,8 @@ public final class BuildContext {
         Path buildDir = ProjectManifestFiles.resolveBuildDir(projectPath,
                 effective.getOutputDir());
 
-        if (needsBuild(phases) && effective.isPackagesDeclared()) {
+        if (needsBuild(phases)
+                && (effective.isPackagesDeclared() || Files.isDirectory(packagesDir))) {
             SyncResult sync = doRefresh(configuration);
             if (sync.isFailure()) {
                 printer.println(Severity.ERROR, "Falha ao resolver dependencias; abortando");

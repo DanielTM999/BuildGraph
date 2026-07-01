@@ -91,7 +91,16 @@ public final class ManifestResolver {
             raw.setActiveProfile(profileOverride);
         }
         ManifestRootModel effective = ManifestProfiles.effective(raw);
+        Path packagesDir = packagesDirOverride != null
+                ? packagesDirOverride : packagesDir(effective);
         if (!effective.isPackagesDeclared() || effective.getPackages().isEmpty()) {
+            // Sem dependencias declaradas: desmaterializa o que restou (drop de dep).
+            boolean removed = LibrariesCleaner.clean(packagesDir, Set.of());
+            if (removed) {
+                info(log, "Nenhuma dependencia no manifest; pacotes desmaterializados em "
+                        + packagesDir);
+                return SyncResult.APPLIED_CHANGED;
+            }
             return SyncResult.NO_PACKAGES;
         }
 
@@ -111,8 +120,6 @@ public final class ManifestResolver {
                         manifestFile, variant.token()));
             }
 
-            Path packagesDir = packagesDirOverride != null
-                    ? packagesDirOverride : packagesDir(effective);
             Files.createDirectories(packagesDir);
 
             Set<String> keep = new LinkedHashSet<>();
