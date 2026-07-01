@@ -19,5 +19,6 @@ public record LifecycleContext(
         Path buildDir,
         String buildMode,
         PlaceholderResolver placeholders,
-        Consumer<String> output) {
+        Consumer<String> output,
+        Consumer<String> info) {
 }

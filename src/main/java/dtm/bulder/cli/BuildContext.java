@@ -28,10 +28,15 @@ import dtm.bulder.repo.SyncResult;
 import java.nio.file.Path;
 import java.nio.file.Files;
 import java.io.IOException;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Set;
 import java.util.function.Consumer;
 
 public final class BuildContext {
+
+    private static final int LINE_WIDTH = 72;
+    private static final String SEPARATOR = "-".repeat(LINE_WIDTH);
 
     private final Path projectPath;
     private final String repoOverride;
@@ -131,6 +136,9 @@ public final class BuildContext {
         ManifestProfileModel activeProfile = ManifestProfiles.activeProfile(raw);
         ManifestRootModel effective = configuration.effective();
 
+        printProjectHeader(effective, hasManifest);
+        long startNanos = System.nanoTime();
+
         String buildMode = activeProfile != null && notBlank(activeProfile.getBuildType())
                 ? activeProfile.getBuildType() : "Debug";
 
@@ -154,19 +162,63 @@ public final class BuildContext {
 
         LifecycleContext ctx = new LifecycleContext(projectPath, effective, toolchain, buildSystem,
                 configuration.repository(), packagesDir, buildDir, buildMode, placeholders,
-                buildOutput());
+                buildOutput(), line -> printer.println(Severity.INFO, "{}", line));
 
         LifecycleResult result = LifecycleExecutor.run(ctx, phases);
 
-        printer.println(Severity.INFO, "------------------------------------------------");
+        long elapsedMillis = (System.nanoTime() - startNanos) / 1_000_000L;
+        printBuildSummary(result, elapsedMillis);
+        return result.success();
+    }
+
+    private void printProjectHeader(ManifestRootModel manifest, boolean hasManifest) {
+        String id = notBlank(manifest.getId()) ? manifest.getId() : manifest.getName();
+        String name = notBlank(manifest.getName()) ? manifest.getName()
+                : (notBlank(id) ? id : projectPath.getFileName().toString());
+        String coordinate = notBlank(id) ? id
+                : (hasManifest ? name : projectPath.getFileName().toString());
+        String version = notBlank(manifest.getVersion()) ? manifest.getVersion() : null;
+        String kind = manifest.isLibrary() ? "lib" : "exe";
+
+        printer.println(Severity.INFO, "");
+        printer.println(Severity.INFO, "{}", centered("< " + coordinate + " >"));
+        printer.println(Severity.INFO, "Building {}", version == null ? name : name + " " + version);
+        printer.println(Severity.INFO, "{}", centered("[ " + kind + " ]"));
+    }
+
+    private void printBuildSummary(LifecycleResult result, long elapsedMillis) {
+        printer.println(Severity.INFO, "");
+        printer.println(Severity.INFO, "{}", SEPARATOR);
         if (result.success()) {
             printer.println(Severity.INFO, "BUILD SUCCESS", RawFormater.TextColor.GREEN);
         } else {
-            printer.println(Severity.ERROR, "BUILD FAILURE - {}", result.message(),
-                    RawFormater.TextColor.RED);
+            printer.println(Severity.ERROR, "BUILD FAILURE", RawFormater.TextColor.RED);
+            printer.println(Severity.ERROR, "{}", result.message());
         }
-        printer.println(Severity.INFO, "------------------------------------------------");
-        return result.success();
+        printer.println(Severity.INFO, "{}", SEPARATOR);
+        printer.println(Severity.INFO, "Total time:  {}", formatDuration(elapsedMillis));
+        printer.println(Severity.INFO, "Finished at: {}", ZonedDateTime.now()
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX")));
+        printer.println(Severity.INFO, "{}", SEPARATOR);
+    }
+
+    private static String centered(String label) {
+        int total = LINE_WIDTH - label.length();
+        if (total < 2) {
+            return label;
+        }
+        int left = total / 2;
+        int right = total - left;
+        return "-".repeat(left) + label + "-".repeat(right);
+    }
+
+    private static String formatDuration(long elapsedMillis) {
+        if (elapsedMillis < 60_000L) {
+            return String.format(java.util.Locale.ROOT, "%.3f s", elapsedMillis / 1000.0);
+        }
+        long totalSeconds = elapsedMillis / 1000L;
+        return String.format(java.util.Locale.ROOT, "%02d:%02d min",
+                totalSeconds / 60, totalSeconds % 60);
     }
 
     private Consumer<String> buildOutput() {

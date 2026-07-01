@@ -113,7 +113,7 @@ jobs:
           path: release-assets/*
           archive: false
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 90
 
   release:
     name: Create tagged release

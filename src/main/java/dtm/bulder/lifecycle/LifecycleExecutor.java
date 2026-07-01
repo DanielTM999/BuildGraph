@@ -36,8 +36,8 @@ public final class LifecycleExecutor {
             if (!phases.contains(phase)) {
                 continue;
             }
-            ctx.output().accept("------------------------------------------------");
-            ctx.output().accept("Phase: " + phase.name());
+            ctx.info().accept("");
+            ctx.info().accept("--- " + phase.name().toLowerCase() + " ---");
 
             if (!TaskExecutor.runPhaseTasks(ctx, phase, "before")) {
                 return LifecycleResult.fail("Task 'before' da fase " + phase + " falhou");
@@ -74,9 +74,6 @@ public final class LifecycleExecutor {
     }
 
     private static LifecycleResult toResult(BuildResult r, String label) {
-        if (r.message() != null) {
-
-        }
         return r.success()
                 ? LifecycleResult.ok(label + ": " + r.message())
                 : LifecycleResult.fail(label + ": " + r.message());
@@ -85,7 +82,7 @@ public final class LifecycleExecutor {
     private static LifecycleResult clean(LifecycleContext ctx) {
         try {
             SafeZipExtractor.deleteTree(ctx.buildDir());
-            ctx.output().accept("Limpo: " + ctx.buildDir());
+            ctx.info().accept("Removido diretorio de build: " + ctx.buildDir());
             return LifecycleResult.ok("Clean concluido");
         } catch (IOException e) {
             return LifecycleResult.fail("Clean falhou: " + e.getMessage());
@@ -138,7 +135,7 @@ public final class LifecycleExecutor {
             }
 
             Path variantDir = ctx.repo().publish(id, version, content, lm);
-            ctx.output().accept("Instalado no repo global: " + variantDir);
+            ctx.info().accept("Instalado no repo global: " + variantDir);
             return LifecycleResult.ok("Install concluido (" + id + ":" + version + ")");
         } catch (IOException e) {
             return LifecycleResult.fail("Install falhou: " + e.getMessage());
