@@ -9,6 +9,7 @@ profiles incrementais, resolução de packages, tarefas de lifecycle e repositó
 - [Download](#download)
 - [Uso da CLI](#uso)
 - [Modo interativo](#modo-interativo)
+- [Integração com clangd](#integração-com-clangd)
 - [Formatos de saída](#formatos-de-saída-e-exit-codes)
 - [Manifest](#manifest)
 - [Compiladores e caminhos](#compiladores-e-caminhos-dos-executáveis)
@@ -42,7 +43,7 @@ java -jar BuildGraph.jar --help
 buildgraph [projectPath] [clean] [build] [test] [install] [refresh]
            [--interactive] [-f raw|json|xml]
            [-p profile] [-c compiler]
-           [--repo caminho] [--packages caminho]
+           [--repo caminho] [--packages caminho] [--compile-commands]
 ```
 
 Se `projectPath` não for informado, o diretório atual será usado. Sem uma fase explícita,
@@ -60,6 +61,7 @@ BuildGraph executa `build`.
 | `-c`, `--compiler` | Compilador usado somente quando o manifest não define compiladores. |
 | `--repo`, `--external` | Repositório adicional, depois dos repositórios do manifest. |
 | `--packages`, `--out` | Pasta local usada quando `packagesBase` não está configurado. |
+| `--compile-commands`, `--clangd` | Imprime um `compile_commands.json` resolvido no stdout e encerra. |
 
 Exemplos:
 
@@ -114,6 +116,7 @@ Ao iniciar, o modo interativo:
 | `refresh` | Resolve novamente os packages e atualiza a pasta materializada. |
 | `reload` | Relê o manifest e imprime seus diagnósticos, sem executar build. |
 | `status` | Mostra projeto, build system detectado e toolchain selecionada. |
+| `compile-commands`, `clangd` ou `compdb` | Emite a compilation database resolvida como JSON bruto. |
 | `help` ou `?` | Mostra os comandos aceitos. |
 | `quit`, `exit` ou `q` | Encerra a sessão. |
 
@@ -132,6 +135,68 @@ Exemplo de controle por pipe no PowerShell:
 
 Com `--format json` ou `--format xml`, todas as respostas continuam usando o formato escolhido, o
 que permite controlar a sessão por outro processo sem analisar texto colorido.
+
+## Integração com clangd
+
+clangd utiliza uma compilation database chamada `compile_commands.json` para descobrir o
+compilador, linguagem, standards, includes, defines e flags de cada arquivo. BuildGraph gera esse
+conteúdo a partir da configuração efetiva, evitando que uma IDE ou plugin precise interpretar o
+manifest por conta própria.
+
+### CLI de execução única
+
+Use `--compile-commands`; `--clangd` e `--compdb` são aliases:
+
+```shell
+BuildGraph . --compile-commands > compile_commands.json
+clangd --compile-commands-dir=.
+```
+
+O stdout contém somente o array JSON da compilation database, sem prefixos, cores ou mensagens de
+log. Erros são enviados para stderr e retornam exit code `1`. `--format` não altera esse payload.
+
+A resolução considera:
+
+- Manifest raiz e profile ativo.
+- `cCompiler` e `cxxCompiler`, com `--compiler` como fallback.
+- `cStandard`, `cxxStandard`, sysroot, target, defines e flags de compilação.
+- `sourceFolders` e extensões de cada fonte.
+- Includes do projeto e de packages materializados.
+- `Debug`/`Release` e o `outputDir` efetivo.
+
+É emitida uma entrada por fonte, usando o campo `arguments` para evitar problemas de escaping de
+shell. Cada entrada contém `directory`, `file`, `arguments` e `output`.
+
+Se existirem packages declarados, BuildGraph executa sua resolução silenciosamente antes de gerar
+o JSON, garantindo que os include paths materializados estejam disponíveis. Em projetos CMake,
+Meson ou Make, se `<outputDir>/compile_commands.json` já existir, BuildGraph retorna esse arquivo
+normalizado em uma única linha; caso contrário, gera uma base a partir do manifest e das fontes
+detectadas.
+
+### Modo interativo
+
+Durante uma sessão, envie qualquer um destes comandos:
+
+```text
+compile-commands
+clangd
+compdb
+```
+
+A resposta é o array JSON bruto em uma única mensagem no stdout, independentemente do formato de
+logs da sessão. O programa integrador pode enviar `compile-commands`, ler o próximo payload JSON e
+gravá-lo como `compile_commands.json` antes de iniciar ou recarregar o clangd.
+
+Exemplo conceitual de integração:
+
+```text
+IDE/plugin -> stdin do BuildGraph:  compile-commands\n
+BuildGraph -> stdout:              [{"directory":"...","file":"...","arguments":[...]}]
+IDE/plugin:                        grava o JSON e inicia/recarrega clangd
+```
+
+Alterações no manifest são consideradas na próxima solicitação, pois a configuração efetiva é
+recalculada a cada comando.
 
 ## Formatos de saída e exit codes
 

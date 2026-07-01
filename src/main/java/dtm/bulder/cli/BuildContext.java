@@ -5,6 +5,7 @@ import dtm.bulder.build.BuildSystem;
 import dtm.bulder.build.BuildSystemDetector;
 import dtm.bulder.build.Toolchain;
 import dtm.bulder.build.ToolchainDetector;
+import dtm.bulder.integration.CompilationDatabaseGenerator;
 import dtm.bulder.manifest.ManifestProfiles;
 import dtm.bulder.manifest.ManifestResolver;
 import dtm.bulder.manifest.ProjectManifestFiles;
@@ -25,6 +26,8 @@ import dtm.bulder.repo.GlobalRepository;
 import dtm.bulder.repo.SyncResult;
 
 import java.nio.file.Path;
+import java.nio.file.Files;
+import java.io.IOException;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -64,6 +67,42 @@ public final class BuildContext {
     public SyncResult refresh() {
         Configuration configuration = configuration(readManifest());
         return doRefresh(configuration);
+    }
+
+    public String compilationDatabaseJson() {
+        ManifestParseResult parse = readManifest();
+        if (!parse.isOk()) {
+            throw new IllegalStateException("Manifest invalido");
+        }
+        Configuration configuration = configuration(parse);
+        ManifestRootModel raw = configuration.raw();
+        ManifestRootModel effective = configuration.effective();
+        Path buildDir = ProjectManifestFiles.resolveBuildDir(projectPath,
+                effective.getOutputDir());
+        BuildSystem buildSystem = BuildSystemDetector.detect(projectPath,
+                manifestPath() != null);
+        Path existing = buildDir.resolve("compile_commands.json");
+        if (buildSystem != BuildSystem.MANIFEST && buildSystem != BuildSystem.DEFAULT
+                && Files.isRegularFile(existing)) {
+            try {
+                return CompilationDatabaseGenerator.normalize(Files.readString(existing));
+            } catch (IOException e) {
+                throw new IllegalStateException("Falha ao ler " + existing, e);
+            }
+        }
+        if (effective.isPackagesDeclared()) {
+            SyncResult sync = configuration.resolver().syncPackages(profileOverride,
+                    configuration.packagesDir(), null);
+            if (sync.isFailure()) {
+                throw new IllegalStateException("Falha ao resolver dependencias: " + sync.name());
+            }
+        }
+        ManifestProfileModel activeProfile = ManifestProfiles.activeProfile(raw);
+        String buildMode = activeProfile != null && notBlank(activeProfile.getBuildType())
+                ? activeProfile.getBuildType() : "Debug";
+        Toolchain toolchain = ToolchainDetector.resolve(effective, compilerOverride);
+        return CompilationDatabaseGenerator.generate(projectPath, effective, toolchain,
+                configuration.packagesDir(), buildDir, buildMode);
     }
 
     private SyncResult doRefresh(Configuration configuration) {

@@ -69,6 +69,7 @@ public final class InteractiveSession {
             case "refresh" -> context.refresh();
             case "reload" -> context.printDiagnostics();
             case "status" -> printer.println(Severity.INFO, "{}", context.describe());
+            case "compile-commands", "clangd", "compdb" -> printCompilationDatabase();
             case "help", "?" -> printBanner();
             case "quit", "exit", "q" -> {
                 return false;
@@ -84,8 +85,18 @@ public final class InteractiveSession {
         context.refresh();
     }
 
+    private void printCompilationDatabase() {
+        try {
+            printer.printlnRaw(context.compilationDatabaseJson());
+        } catch (RuntimeException e) {
+            printer.println(Severity.ERROR, "Falha ao gerar compile_commands.json: {}",
+                    e.getMessage());
+        }
+    }
+
     private void printBanner() {
         printer.println(Severity.INFO,
-                "Modo interativo. Comandos: build, clean, test, install, refresh, reload, status, quit");
+                "Modo interativo. Comandos: build, clean, test, install, refresh, reload, status, "
+                        + "compile-commands, quit");
     }
 }

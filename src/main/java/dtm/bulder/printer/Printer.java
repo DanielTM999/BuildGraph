@@ -82,6 +82,15 @@ public final class Printer {
         }
     }
 
+    public void printlnRaw(String value) {
+        synchronized (enqueueLock) {
+            if (closing.get()) {
+                return;
+            }
+            printQueue.offer(PrintTask.raw(value));
+        }
+    }
+
     private void processQueue() {
         while (true) {
             try {
@@ -92,7 +101,11 @@ public final class Printer {
                 }
 
                 try {
-                    printNow(task.severity, task.object, task.formaterType, task.args);
+                    if (task.raw) {
+                        System.out.println(task.object);
+                    } else {
+                        printNow(task.severity, task.object, task.formaterType, task.args);
+                    }
                 } catch (Throwable throwable) {
                     throwable.printStackTrace(System.err);
                     requestExitAfterDrain(1);
@@ -179,6 +192,7 @@ public final class Printer {
         private final FormaterType formaterType;
         private final Object[] args;
         private final boolean poison;
+        private final boolean raw;
 
         private PrintTask(Severity severity, Object object, FormaterType formaterType, Object[] args) {
             this.object = object;
@@ -186,18 +200,24 @@ public final class Printer {
             this.formaterType = formaterType;
             this.args = args != null ? args : new Object[0];
             this.poison = false;
+            this.raw = false;
         }
 
-        private PrintTask() {
-            this.object = null;
+        private PrintTask(Object object, boolean poison, boolean raw) {
+            this.object = object;
             this.severity = Severity.INFO;
             this.formaterType = null;
             this.args = new Object[0];
-            this.poison = true;
+            this.poison = poison;
+            this.raw = raw;
         }
 
         private static PrintTask poison() {
-            return new PrintTask();
+            return new PrintTask(null, true, false);
+        }
+
+        private static PrintTask raw(String value) {
+            return new PrintTask(value, false, true);
         }
     }
 }

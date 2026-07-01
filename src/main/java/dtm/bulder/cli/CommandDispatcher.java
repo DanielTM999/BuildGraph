@@ -48,6 +48,16 @@ public final class CommandDispatcher {
         BuildContext context = new BuildContext(projectPath, args.getRepoPath(),
                 args.getProfile(), args.getCompiler(), args.getPackagesDir(), printer);
 
+        if (args.hasCompileCommands()) {
+            try {
+                System.out.println(context.compilationDatabaseJson());
+                return 0;
+            } catch (RuntimeException e) {
+                System.err.println("Falha ao gerar compile_commands.json: " + e.getMessage());
+                return 1;
+            }
+        }
+
         printer.println(Severity.INFO, "Scanning for projects...");
 
         if (args.isInteractive()) {
@@ -110,7 +120,7 @@ public final class CommandDispatcher {
         printer.println(Severity.NONE,
                 "                [--interactive] [-f <fmt>] [-p <profile>] [-c <compiler>]");
         printer.println(Severity.NONE,
-                "                [--repo <path>] [--packages <dir>]");
+                "                [--repo <path>] [--packages <dir>] [--compile-commands]");
         printer.println(Severity.NONE, "");
         printer.println(Severity.NONE, "  projectPath   diretorio do projeto (default: diretorio atual)");
         printer.println(Severity.NONE, "  clean/build/install/test  fases do lifecycle (default: build)");
@@ -121,6 +131,7 @@ public final class CommandDispatcher {
         printer.println(Severity.NONE, "  -c, --compiler compilador C/C++ (fallback do manifest)");
         printer.println(Severity.NONE, "  --repo/--external  repo adicional; default final: ~/.buildgraph/repository");
         printer.println(Severity.NONE, "  --packages/--out   pasta local (fallback de packagesBase)");
+        printer.println(Severity.NONE, "  --compile-commands/--clangd  imprime compile_commands.json no stdout");
         printer.println(Severity.NONE, "  outputDir default  <projeto>/build");
         printer.println(Severity.NONE, "  precedencia        manifest/profile -> CLI -> defaults");
         printer.println(Severity.NONE, "  install       publica o projeto (id:version) no repo global");

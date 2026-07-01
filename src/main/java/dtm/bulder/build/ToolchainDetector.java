@@ -41,12 +41,12 @@ public final class ToolchainDetector {
         if (notBlank(cc) || notBlank(cxx)) {
             Path ccPath = notBlank(cc) ? resolvePath(cc.trim()) : null;
             Path cxxPath = notBlank(cxx) ? resolvePath(cxx.trim()) : ccPath;
-            return new Toolchain(ToolchainKind.CUSTOM, ccPath, cxxPath);
+            return new Toolchain(inferKind(ccPath, cxxPath), ccPath, cxxPath);
         }
 
         if (compilerOverride != null && !compilerOverride.isBlank()) {
             Path p = resolvePath(compilerOverride.trim());
-            return new Toolchain(ToolchainKind.CUSTOM, p, p);
+            return new Toolchain(inferKind(p, p), p, p);
         }
 
         List<Toolchain> all = detectAll();
@@ -56,6 +56,28 @@ public final class ToolchainDetector {
     private static Path resolvePath(String exe) {
         Path found = ToolProbe.findOnPath(exe);
         return found != null ? found : Path.of(exe);
+    }
+
+    private static ToolchainKind inferKind(Path cc, Path cxx) {
+        String names = executableName(cc) + " " + executableName(cxx);
+        if (names.matches(".*(^|\\s)(cl|clang-cl)(\\s|$).*$")) {
+            return ToolchainKind.MSVC;
+        }
+        if (names.contains("clang")) {
+            return ToolchainKind.SYSTEM_CLANG;
+        }
+        if (names.contains("gcc") || names.contains("g++")) {
+            return ToolProbe.isWindows() ? ToolchainKind.MINGW : ToolchainKind.GCC;
+        }
+        return ToolchainKind.CUSTOM;
+    }
+
+    private static String executableName(Path path) {
+        if (path == null || path.getFileName() == null) {
+            return "";
+        }
+        String name = path.getFileName().toString().toLowerCase();
+        return name.endsWith(".exe") ? name.substring(0, name.length() - 4) : name;
     }
 
     private static boolean notBlank(String s) {

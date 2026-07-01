@@ -61,6 +61,17 @@ class UserArgsTest {
     }
 
     @Test
+    void compileCommandsFlagDoesNotInferBuild() {
+        UserArgs clangd = new UserArgs(new String[]{"--clangd"});
+        UserArgs canonical = new UserArgs(new String[]{"--compile-commands"});
+
+        assertTrue(clangd.hasCompileCommands());
+        assertTrue(canonical.hasCompileCommands());
+        assertFalse(clangd.hasBuild());
+        assertFalse(canonical.hasBuild());
+    }
+
+    @Test
     void unknownArgumentIsInvalid() {
         UserArgs a = new UserArgs(new String[]{"/p", "--bogus"});
         assertTrue(a.isInvalidCommand());

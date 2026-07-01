@@ -13,6 +13,7 @@ public final class UserArgs {
     public static final String COMPILER = "compiler";
     public static final String REPO = "repo";
     public static final String PACKAGES = "packages_dir";
+    public static final String COMPILE_COMMANDS = "compile_commands";
 
     public static final String HAS_HELP = "has_help";
     public static final String INVALID_COMMAND = "invalid_command";
@@ -117,6 +118,10 @@ public final class UserArgs {
         return flag(INTERACTIVE);
     }
 
+    public boolean hasCompileCommands() {
+        return flag(COMPILE_COMMANDS);
+    }
+
     public Map<String, String> asMap() {
         return Collections.unmodifiableMap(argsMap);
     }
@@ -134,6 +139,7 @@ public final class UserArgs {
         argsMap.put(TEST, "false");
         argsMap.put(REFRESH, "false");
         argsMap.put(INTERACTIVE, "false");
+        argsMap.put(COMPILE_COMMANDS, "false");
 
         if (args == null || args.length == 0) {
 
@@ -163,6 +169,8 @@ public final class UserArgs {
             switch (arg) {
                 case CLEAN, BUILD, INSTALL, TEST, REFRESH -> argsMap.put(arg, "true");
                 case "--interactive", "-i" -> argsMap.put(INTERACTIVE, "true");
+                case "--compile-commands", "--clangd", "--compdb" ->
+                        argsMap.put(COMPILE_COMMANDS, "true");
                 case "-f", "-format", "--format" -> i = readValue(args, i, FORMAT);
                 case "-p", "-profile", "--profile" -> i = readValue(args, i, PROFILE);
                 case "-c", "-compiler", "--compiler" -> i = readValue(args, i, COMPILER);
@@ -173,7 +181,7 @@ public final class UserArgs {
         }
 
         if (!hasClean() && !hasBuild() && !hasInstall() && !hasTest()
-                && !hasRefresh() && !isInteractive()) {
+                && !hasRefresh() && !isInteractive() && !hasCompileCommands()) {
             argsMap.put(BUILD, "true");
         }
     }

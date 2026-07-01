@@ -12,16 +12,25 @@ public final class CompileCommandBuilder {
     }
 
     public static List<String> buildCompileCommand(CompileSpec spec) {
+        return buildCommand(spec, false);
+    }
+
+    public static List<String> buildCompileOnlyCommand(CompileSpec spec) {
+        return buildCommand(spec, true);
+    }
+
+    private static List<String> buildCommand(CompileSpec spec, boolean compileOnly) {
         Toolchain toolchain = spec.toolchain();
         Path driver = toolchain.driver(spec.cpp());
 
         if (toolchain.isMsvc()) {
-            return buildMsvc(spec, driver);
+            return buildMsvc(spec, driver, compileOnly);
         }
-        return buildGccClang(spec, driver);
+        return buildGccClang(spec, driver, compileOnly);
     }
 
-    private static List<String> buildGccClang(CompileSpec spec, Path driver) {
+    private static List<String> buildGccClang(CompileSpec spec, Path driver,
+                                               boolean compileOnly) {
         ManifestRootModel manifest = spec.manifest();
         List<String> cmd = new ArrayList<>();
         cmd.add(driver.toString());
@@ -51,8 +60,10 @@ public final class CompileCommandBuilder {
             cmd.add("-g");
         }
 
-        if (spec.library()) {
+        if (spec.library() && !compileOnly) {
             cmd.add("-shared");
+        }
+        if (spec.library()) {
             if (!ToolProbe.isWindows()) {
                 cmd.add("-fPIC");
             }
@@ -76,6 +87,13 @@ public final class CompileCommandBuilder {
             cmd.add(source.toString());
         }
 
+        if (compileOnly) {
+            cmd.add("-c");
+            cmd.add("-o");
+            cmd.add(spec.artifact().toString());
+            return cmd;
+        }
+
         for (Path libDir : spec.extraLibDirs()) {
             cmd.add("-L" + libDir);
         }
@@ -93,7 +111,7 @@ public final class CompileCommandBuilder {
         return cmd;
     }
 
-    private static List<String> buildMsvc(CompileSpec spec, Path driver) {
+    private static List<String> buildMsvc(CompileSpec spec, Path driver, boolean compileOnly) {
         ManifestRootModel manifest = spec.manifest();
         List<String> cmd = new ArrayList<>();
         cmd.add(driver.toString());
@@ -124,7 +142,12 @@ public final class CompileCommandBuilder {
         for (Path source : spec.sources()) {
             cmd.add(source.toString());
         }
-        cmd.add("/Fe:" + spec.artifact());
+        if (compileOnly) {
+            cmd.add("/c");
+            cmd.add("/Fo:" + spec.artifact());
+        } else {
+            cmd.add("/Fe:" + spec.artifact());
+        }
         return cmd;
     }
 

@@ -27,4 +27,18 @@ class ToolchainDetectorTest {
         assertEquals(Path.of("cli-cc-not-on-path"), toolchain.cc());
         assertEquals(toolchain.cc(), toolchain.cxx());
     }
+
+    @Test
+    void recognizesCompilerFamilyFromConfiguredExecutable() {
+        ManifestRootModel clangManifest = new ManifestRootModel();
+        clangManifest.setCCompiler("clang");
+        clangManifest.setCxxCompiler("clang++");
+        ManifestRootModel msvcManifest = new ManifestRootModel();
+        msvcManifest.setCCompiler("cl.exe");
+
+        assertEquals(ToolchainKind.SYSTEM_CLANG,
+                ToolchainDetector.resolve(clangManifest, null).kind());
+        assertEquals(ToolchainKind.MSVC,
+                ToolchainDetector.resolve(msvcManifest, null).kind());
+    }
 }
