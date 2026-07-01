@@ -42,7 +42,7 @@ public final class InteractiveSession {
                 new InputStreamReader(System.in, StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                if (!handle(line.trim())) {
+                if (!handle(line.replace("\uFEFF", "").trim())) {
                     break;
                 }
             }
@@ -58,23 +58,57 @@ public final class InteractiveSession {
     }
 
     private boolean handle(String command) {
-        switch (command.toLowerCase()) {
+        String lower = command.toLowerCase();
+        switch (lower) {
             case "" -> {
                 return true;
             }
-            case "build" -> context.runPhases(EnumSet.of(Phase.BUILD));
-            case "clean" -> context.runPhases(EnumSet.of(Phase.CLEAN));
-            case "test" -> context.runPhases(EnumSet.of(Phase.TEST));
-            case "install" -> context.runPhases(EnumSet.of(Phase.INSTALL));
-            case "refresh" -> context.refresh();
-            case "reload" -> context.printDiagnostics();
-            case "status" -> printer.println(Severity.INFO, "{}", context.describe());
-            case "compile-commands", "clangd", "compdb" -> printCompilationDatabase();
-            case "help", "?" -> printBanner();
+            case "refresh" -> {
+                context.refresh();
+                return true;
+            }
+            case "reload" -> {
+                context.printDiagnostics();
+                return true;
+            }
+            case "status" -> {
+                printer.println(Severity.INFO, "{}", context.describe());
+                return true;
+            }
+            case "compile-commands", "clangd", "compdb" -> {
+                printCompilationDatabase();
+                return true;
+            }
+            case "help", "?" -> {
+                printBanner();
+                return true;
+            }
             case "quit", "exit", "q" -> {
                 return false;
             }
-            default -> printer.println(Severity.WARNING, "Comando desconhecido: {}", command);
+            default -> {
+            }
+        }
+        return runPhaseLine(command, lower);
+    }
+
+    private boolean runPhaseLine(String command, String lower) {
+        EnumSet<Phase> phases = EnumSet.noneOf(Phase.class);
+        for (String token : lower.split("\\s+")) {
+            if (token.isEmpty()) {
+                continue;
+            }
+            Phase phase = Phase.fromString(token);
+            if (phase == null) {
+                printer.println(Severity.WARNING, "Comando desconhecido: {}", command);
+                return true;
+            }
+            phases.add(phase);
+        }
+        if (!phases.isEmpty()) {
+            // A ordem de execucao segue o lifecycle (clean -> build -> test -> install),
+            // independente da ordem digitada.
+            context.runPhases(phases);
         }
         return true;
     }
@@ -96,7 +130,9 @@ public final class InteractiveSession {
 
     private void printBanner() {
         printer.println(Severity.INFO,
-                "Modo interativo. Comandos: build, clean, test, install, refresh, reload, status, "
-                        + "compile-commands, quit");
+                "Modo interativo. Fases (combinaveis, ordenadas pelo lifecycle): clean, build, "
+                        + "test, install. Ex: 'install build clean' roda clean -> build -> install.");
+        printer.println(Severity.INFO,
+                "Outros comandos: refresh, reload, status, compile-commands, help, quit");
     }
 }
