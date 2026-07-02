@@ -89,6 +89,9 @@ BuildGraph . refresh --repo D:/buildgraph-repository
 As fases solicitadas são sempre ordenadas como `clean → build → test → install`, mesmo que tenham
 sido escritas em outra ordem. `test` e `install` também implicam `build`.
 
+Durante o build, o progresso é exibido como `[atual/total]`, começando em `[0/n]`. O mesmo
+formato é usado nos modos normal e interativo, inclusive com targets executados em paralelo.
+
 ## Modo interativo
 
 O modo interativo mantém o processo aberto, lê comandos pela entrada padrão e reutiliza o mesmo

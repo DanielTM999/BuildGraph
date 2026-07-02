@@ -54,7 +54,12 @@ public final class BuildExecutor {
 
         if (!resolution.multiTarget()) {
             TargetGraph legacy = TargetGraph.of(resolution.targets());
-            return compileTarget(req, resolution.targets().get(0), legacy, null, req.output());
+            ResolvedTarget target = resolution.targets().get(0);
+            progress(req, 0, 1, "Iniciando build");
+            BuildResult result = compileTarget(req, target, legacy, null, req.output());
+            progress(req, 1, 1, "Target " + target.id() + " "
+                    + (result.success() ? "concluido" : "falhou"));
+            return result;
         }
 
         TargetGraph graph = TargetGraph.of(resolution.targets());
@@ -248,26 +253,33 @@ public final class BuildExecutor {
 
     private static BuildResult cmake(BuildRequest req) {
         Path buildDir = req.buildDir();
+        progress(req, 0, 2, "Iniciando build");
         List<String> configure = List.of("cmake", "-S", ".", "-B", buildDir.toString(),
                 "-DCMAKE_BUILD_TYPE=" + req.buildMode());
         req.output().accept("+ " + String.join(" ", configure));
         int c = ProcessRunner.run(configure, req.projectPath(), null, req.output());
+        progress(req, 1, 2, c == 0 ? "CMake configurado" : "CMake configure falhou");
         if (c != 0) {
             return BuildResult.fail(c, "cmake configure falhou (exit " + c + ")");
         }
         List<String> build = List.of("cmake", "--build", buildDir.toString());
         req.output().accept("+ " + String.join(" ", build));
         int b = ProcessRunner.run(build, req.projectPath(), null, req.output());
+        progress(req, 2, 2, b == 0 ? "CMake build concluido" : "CMake build falhou");
         return b == 0 ? BuildResult.ok(b, buildDir, "CMake build concluido")
                 : BuildResult.fail(b, "cmake build falhou (exit " + b + ")");
     }
 
     private static BuildResult meson(BuildRequest req) {
         Path buildDir = req.buildDir();
-        if (!Files.exists(buildDir.resolve("build.ninja"))) {
+        boolean needsSetup = !Files.exists(buildDir.resolve("build.ninja"));
+        int total = needsSetup ? 2 : 1;
+        progress(req, 0, total, "Iniciando build");
+        if (needsSetup) {
             List<String> setup = List.of("meson", "setup", buildDir.toString());
             req.output().accept("+ " + String.join(" ", setup));
             int s = ProcessRunner.run(setup, req.projectPath(), null, req.output());
+            progress(req, 1, total, s == 0 ? "Meson configurado" : "Meson setup falhou");
             if (s != 0) {
                 return BuildResult.fail(s, "meson setup falhou (exit " + s + ")");
             }
@@ -275,15 +287,24 @@ public final class BuildExecutor {
         List<String> ninja = List.of("ninja", "-C", buildDir.toString());
         req.output().accept("+ " + String.join(" ", ninja));
         int n = ProcessRunner.run(ninja, req.projectPath(), null, req.output());
+        progress(req, total, total, n == 0 ? "Ninja concluido" : "Ninja falhou");
         return n == 0 ? BuildResult.ok(n, buildDir, "Meson build concluido")
                 : BuildResult.fail(n, "ninja falhou (exit " + n + ")");
     }
 
     private static BuildResult make(BuildRequest req) {
+        progress(req, 0, 1, "Iniciando build");
         List<String> make = List.of("make");
         req.output().accept("+ " + String.join(" ", make));
         int m = ProcessRunner.run(make, req.projectPath(), null, req.output());
+        progress(req, 1, 1, m == 0 ? "Make concluido" : "Make falhou");
         return m == 0 ? BuildResult.ok(m, req.projectPath(), "make concluido")
                 : BuildResult.fail(m, "make falhou (exit " + m + ")");
+    }
+
+    private static void progress(BuildRequest req, int current, int total, String message) {
+        if (req.output() != null) {
+            req.output().accept("[" + current + "/" + total + "] " + message);
+        }
     }
 }
