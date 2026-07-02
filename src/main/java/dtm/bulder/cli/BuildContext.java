@@ -44,15 +44,26 @@ public final class BuildContext {
     private final String compilerOverride;
     private final String packagesOverride;
     private final Printer printer;
+    private final int jobs;
+    private final java.util.List<String> onlyTargets;
 
     public BuildContext(Path projectPath, String repoOverride, String profileOverride,
                         String compilerOverride, String packagesOverride, Printer printer) {
+        this(projectPath, repoOverride, profileOverride, compilerOverride, packagesOverride,
+                printer, 0, java.util.List.of());
+    }
+
+    public BuildContext(Path projectPath, String repoOverride, String profileOverride,
+                        String compilerOverride, String packagesOverride, Printer printer,
+                        int jobs, java.util.List<String> onlyTargets) {
         this.projectPath = ProjectManifestFiles.normalizeRoot(projectPath);
         this.repoOverride = repoOverride;
         this.profileOverride = profileOverride;
         this.compilerOverride = compilerOverride;
         this.packagesOverride = packagesOverride;
         this.printer = printer;
+        this.jobs = jobs;
+        this.onlyTargets = onlyTargets == null ? java.util.List.of() : onlyTargets;
     }
 
     public Path projectPath() {
@@ -163,7 +174,8 @@ public final class BuildContext {
 
         LifecycleContext ctx = new LifecycleContext(projectPath, effective, toolchain, buildSystem,
                 configuration.repository(), packagesDir, buildDir, buildMode, placeholders,
-                buildOutput(), line -> printer.println(Severity.INFO, "{}", line));
+                buildOutput(), line -> printer.println(Severity.INFO, "{}", line),
+                jobs, onlyTargets);
 
         LifecycleResult result = LifecycleExecutor.run(ctx, phases);
 
@@ -242,7 +254,30 @@ public final class BuildContext {
         Toolchain toolchain = ToolchainDetector.resolve(configuration.effective(), compilerOverride);
         return "project=" + projectPath
                 + ", buildSystem=" + buildSystem
-                + ", toolchain=" + (toolchain == null ? "<nenhuma>" : toolchain.displayName());
+                + ", toolchain=" + (toolchain == null ? "<nenhuma>" : toolchain.displayName())
+                + describeTargets(configuration.effective(), toolchain);
+    }
+
+    private String describeTargets(ManifestRootModel effective, Toolchain toolchain) {
+        dtm.bulder.build.graph.TargetResolution resolution =
+                dtm.bulder.build.graph.TargetResolver.resolve(effective, projectPath,
+                        toolchain != null && toolchain.isMsvc());
+        if (!resolution.multiTarget()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder(", targets=[");
+        boolean first = true;
+        for (dtm.bulder.build.graph.ResolvedTarget t : resolution.targets()) {
+            if (!first) {
+                sb.append(", ");
+            }
+            first = false;
+            sb.append(t.id()).append(':').append(t.type().name().toLowerCase());
+            if (!t.dependsOn().isEmpty()) {
+                sb.append(" <- ").append(String.join("+", t.dependsOn()));
+            }
+        }
+        return sb.append(']').toString();
     }
 
     private Path manifestPath() {

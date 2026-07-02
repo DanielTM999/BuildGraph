@@ -12,6 +12,7 @@ profiles incrementais, resolução de packages, tarefas de lifecycle e repositó
 - [Integração com clangd](#integração-com-clangd)
 - [Formatos de saída](#formatos-de-saída-e-exit-codes)
 - [Manifest](#manifest)
+- [Targets](#targets)
 - [Compiladores e caminhos](#compiladores-e-caminhos-dos-executáveis)
 - [Sistemas de build](#sistemas-de-build)
 - [Fontes, testes e artefatos](#fontes-testes-e-artefatos)
@@ -43,6 +44,7 @@ java -jar BuildGraph.jar --help
 buildgraph [projectPath] [clean] [build] [test] [install] [refresh]
            [--interactive] [-f raw|json|xml]
            [-p profile] [-c compiler]
+           [-t target] [-j jobs]
            [--repo caminho] [--packages caminho] [--compile-commands]
 ```
 
@@ -62,6 +64,8 @@ BuildGraph executa `build`.
 | `--repo`, `--external` | Repositório adicional, depois dos repositórios do manifest. |
 | `--packages`, `--out` | Pasta local usada quando `packagesBase` não está configurado. |
 | `--compile-commands`, `--clangd` | Imprime um `compile_commands.json` resolvido no stdout e encerra. |
+| `-t`, `--target` | Builda apenas o target indicado e suas dependências. Repetível ou separado por vírgula. |
+| `-j`, `--jobs` | Limita o paralelismo entre targets (`-j 1` = serial). Default: número de CPUs. |
 
 Exemplos:
 
@@ -310,6 +314,7 @@ Campos desconhecidos são ignorados. Listas e mapas nulos são tratados como vaz
 | `packagesBase` | string | Pasta local onde dependências resolvidas são materializadas. |
 | `repositories` | string[] | Pastas pesquisadas para localizar packages. |
 | `packages` | object[] | Dependências do projeto. |
+| `targets` | object[] | Targets de build (múltiplos executáveis e bibliotecas). Veja [Targets](#targets). |
 | `activeProfile` | string | Nome do profile efetivo. |
 | `profiles` | object | Profiles disponíveis, indexados pelo nome. |
 | `properties` | object | Valores livres usados por placeholders. |
@@ -369,6 +374,83 @@ Campos aceitos dentro de um profile incluem `buildType`, `platform`, `toolchainV
 `compilerVersion`, `cStandard`, `cxxStandard`, `sysroot`, `cCompiler`, `cxxCompiler`, `outputDir`,
 `packagesBase`, `library`, as listas de compilação, `repositories`, `packages`, `env` e
 `properties`.
+
+### Targets
+
+Um projeto pode declarar múltiplos targets — vários executáveis e bibliotecas na mesma pasta,
+com fontes compartilhadas e saídas independentes. Sem `targets`, o comportamento clássico é
+mantido: um único artefato controlado por `library`.
+
+```json
+{
+  "id": "vema",
+  "version": "0.1.0",
+  "sourceFolders": ["src/shared"],
+  "includePaths": ["include"],
+  "targets": [
+    { "id": "vema-core", "type": "shared", "sourceFolders": ["src/core"],
+      "defines": ["VEMA_CORE_BUILD"] },
+    { "id": "vema-jit",  "type": "static", "sourceFolders": ["src/jit"],
+      "dependsOn": ["vema-core"] },
+    { "id": "vema",      "type": "executable", "sourceFolders": ["src/runtime"],
+      "dependsOn": ["vema-core", "vema-jit"] },
+    { "id": "vemac",     "type": "executable", "sourceFolders": ["src/compiler"],
+      "dependsOn": ["vema-core"] }
+  ],
+  "profiles": {
+    "windows": {
+      "targets": [ { "id": "vema", "defines": ["VEMA_WIN32"] } ]
+    }
+  }
+}
+```
+
+Campos de cada target:
+
+| Campo | Tipo | Semântica |
+| --- | --- | --- |
+| `id` | string | Obrigatório e único. Identifica o target no grafo, em `--target` e na pasta de intermediários. |
+| `name` | string | Nome-base do artefato; default é o `id`. |
+| `type` | string | `executable` (default), `shared` (`.dll`/`.so`/`.dylib`) ou `static` (`.a`/`.lib`). |
+| `sourceFolders` | string[] | Somadas às da raiz; `excludeSourceFolders` remove herdadas. |
+| `includePaths`, `defines` | string[] | Somados aos da raiz; `excludeIncludePaths`/`excludeDefines` removem herdados. |
+| `compileFlags`, `linkFlags` | string[] | Concatenados aos da raiz. |
+| `libraryPaths` | string[] | Somados aos da raiz. |
+| `dependsOn` | string[] | Ids de outros targets: define a ordem de build e o link automático. |
+
+Regras:
+
+- **Herança**: cada target herda o manifesto efetivo (raiz + profile ativo) com as mesmas regras
+  incrementais dos profiles. Declare as pastas compartilhadas na raiz e as específicas em cada
+  target. Em modo multi-target não há fallback para `src`/raiz: um target sem `sourceFolders`
+  efetivos é erro.
+- **Profiles × targets**: `profiles.<nome>.targets` é combinado por `id` com os targets da raiz
+  (listas somam, scalars sobrescrevem); um `id` novo adiciona um target. A ordem final de
+  composição é raiz → profile → target → override do profile no target.
+- **Dependências**: `dependsOn` builda o dep antes e linka automaticamente — shared vira
+  `-L<outputDir> -l<name>`, static entra pelo caminho completo do `.a`/`.lib`. Os `includePaths`
+  do dep são herdados (transitivamente). Dependências devem ser `shared` ou `static`; ciclos e
+  ids desconhecidos são erros.
+- **Paralelismo**: targets independentes no grafo compilam em paralelo por padrão (limite =
+  número de CPUs). `-j N` limita; `-j 1` força serial. Na primeira falha nenhum target novo é
+  iniciado (fail-fast). Logs são prefixados com `[targetId]`.
+- **Saída**: todos os artefatos finais ficam planos em `outputDir` (o exe encontra as DLLs ao
+  lado); objetos intermediários de targets static ficam em `<outputDir>/.obj/<targetId>/`.
+  Colisão de nome de artefato entre targets é erro.
+- **Static**: exige um archiver — `llvm-ar` (procurado ao lado do compilador), `ar` no PATH ou
+  `lib.exe` no MSVC.
+- **`install`**: publica cada target `shared`/`static` como package `<id-do-projeto>-<id-do-target>`
+  com a versão do projeto, contendo o artefato e os `includePaths` do target. Executáveis não são
+  publicados.
+- **`test`**: os testes compilam com as fontes compartilhadas da raiz e linkam contra os
+  artefatos das bibliotecas do projeto.
+- **`--compile-commands`**: emite uma entrada por fonte com as flags do target; em fontes
+  compartilhadas o primeiro target declarado vence.
+- **`library` + `targets`**: se ambos aparecem, `targets` prevalece e um warning é emitido.
+
+Limitações conhecidas: com toolchain MSVC (`cl.exe`), linkar contra um target `shared` requer a
+import lib `<name>.lib` no `outputDir` (com clang/MinGW o link direto funciona; o clang em target
+MSVC gera a import lib automaticamente quando há símbolos exportados via `__declspec(dllexport)`).
 
 ### Repositórios
 

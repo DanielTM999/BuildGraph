@@ -9,12 +9,14 @@ import dtm.bulder.manifest.model.ManifestDiagnostic;
 import dtm.bulder.manifest.model.ManifestPackagesModel;
 import dtm.bulder.manifest.model.ManifestParseResult;
 import dtm.bulder.manifest.model.ManifestRootModel;
+import dtm.bulder.manifest.model.ManifestTargetModel;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -111,12 +113,62 @@ public final class ManifestParser {
             idx++;
         }
 
+        validateTargets(model, diagnostics);
+
         String active = model.getActiveProfile();
         if (active != null && !active.isBlank()
                 && ManifestProfiles.activeProfile(model) == null) {
             diagnostics.add(ManifestDiagnostic.warning("manifest.active-profile-unknown",
                     "activeProfile nao encontrado nos profiles: " + active));
         }
+    }
+
+    private static void validateTargets(ManifestRootModel model, List<ManifestDiagnostic> diagnostics) {
+        if (model.getTargets().isEmpty()) {
+            return;
+        }
+        if (model.isLibrary()) {
+            diagnostics.add(ManifestDiagnostic.warning("manifest.library-with-targets",
+                    "'library' e 'targets' declarados juntos; 'targets' prevalece"));
+        }
+        Set<String> seen = new LinkedHashSet<>();
+        int idx = 0;
+        for (ManifestTargetModel target : model.getTargets()) {
+            if (target == null) {
+                idx++;
+                continue;
+            }
+            String id = target.getId();
+            if (isBlank(id)) {
+                diagnostics.add(ManifestDiagnostic.error("manifest.target-id-missing",
+                        "target[" + idx + "] sem 'id'"));
+            } else if (!seen.add(id.trim())) {
+                diagnostics.add(ManifestDiagnostic.error("manifest.target-id-duplicate",
+                        "target 'id' duplicado: " + id.trim()));
+            }
+            String type = target.getType();
+            if (type != null && !type.isBlank() && !isKnownTargetType(type)) {
+                diagnostics.add(ManifestDiagnostic.error("manifest.target-type-unknown",
+                        "target[" + idx + "] com 'type' desconhecido: " + type
+                                + " (use executable, shared ou static)"));
+            }
+            if (!isBlank(id)) {
+                for (String dep : target.getDependsOn()) {
+                    if (dep != null && dep.trim().equals(id.trim())) {
+                        diagnostics.add(ManifestDiagnostic.error("manifest.target-self-dependency",
+                                "target '" + id.trim() + "' depende de si mesmo"));
+                    }
+                }
+            }
+            idx++;
+        }
+    }
+
+    private static boolean isKnownTargetType(String type) {
+        String t = type.trim().toLowerCase();
+        return ManifestTargetModel.TYPE_EXECUTABLE.equals(t)
+                || ManifestTargetModel.TYPE_SHARED.equals(t)
+                || ManifestTargetModel.TYPE_STATIC.equals(t);
     }
 
     public static String writeString(ManifestRootModel model, boolean xml) throws IOException {

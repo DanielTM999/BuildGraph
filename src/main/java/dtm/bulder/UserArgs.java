@@ -14,6 +14,8 @@ public final class UserArgs {
     public static final String REPO = "repo";
     public static final String PACKAGES = "packages_dir";
     public static final String COMPILE_COMMANDS = "compile_commands";
+    public static final String TARGETS = "targets";
+    public static final String JOBS = "jobs";
 
     public static final String HAS_HELP = "has_help";
     public static final String INVALID_COMMAND = "invalid_command";
@@ -122,6 +124,38 @@ public final class UserArgs {
         return flag(COMPILE_COMMANDS);
     }
 
+    /** Ids passados via --target (repetível ou separados por vírgula). */
+    public java.util.List<String> getTargets() {
+        String raw = argsMap.getOrDefault(TARGETS, "");
+        if (raw.isBlank()) {
+            return java.util.List.of();
+        }
+        java.util.List<String> out = new java.util.ArrayList<>();
+        for (String part : raw.split(",")) {
+            if (!part.isBlank()) {
+                out.add(part.trim());
+            }
+        }
+        return out;
+    }
+
+    public boolean hasTargets() {
+        return !getTargets().isEmpty();
+    }
+
+    /** 0 = default (paralelo com availableProcessors); 1 = serial. */
+    public int getJobs() {
+        String raw = argsMap.getOrDefault(JOBS, "");
+        if (raw.isBlank()) {
+            return 0;
+        }
+        try {
+            return Math.max(1, Integer.parseInt(raw.trim()));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
     public Map<String, String> asMap() {
         return Collections.unmodifiableMap(argsMap);
     }
@@ -176,6 +210,15 @@ public final class UserArgs {
                 case "-c", "-compiler", "--compiler" -> i = readValue(args, i, COMPILER);
                 case "--repo", "--external", "-repo" -> i = readValue(args, i, REPO);
                 case "--packages", "--out", "-o" -> i = readValue(args, i, PACKAGES);
+                case "--target", "-t", "--targets" -> i = appendValue(args, i, TARGETS);
+                case "-j", "--jobs" -> {
+                    i = readValue(args, i, JOBS);
+                    String jobs = argsMap.getOrDefault(JOBS, "");
+                    if (jobs.isBlank() || !jobs.trim().matches("\\d+")
+                            || Integer.parseInt(jobs.trim()) < 1) {
+                        invalid("--jobs requer um numero inteiro >= 1");
+                    }
+                }
                 default -> invalid("Argumento desconhecido: " + arg);
             }
         }
@@ -184,6 +227,17 @@ public final class UserArgs {
                 && !hasRefresh() && !isInteractive() && !hasCompileCommands()) {
             argsMap.put(BUILD, "true");
         }
+    }
+
+    private int appendValue(String[] args, int index, String key) {
+        if (hasValue(args, index)) {
+            String current = argsMap.getOrDefault(key, "");
+            argsMap.put(key, current.isBlank() ? args[index + 1]
+                    : current + "," + args[index + 1]);
+            return index + 1;
+        }
+        invalid("--target requer o id de um target");
+        return index;
     }
 
     private int readValue(String[] args, int index, String key) {

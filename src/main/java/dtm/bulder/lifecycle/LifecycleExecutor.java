@@ -5,6 +5,9 @@ import dtm.bulder.build.BuildExecutor;
 import dtm.bulder.build.BuildRequest;
 import dtm.bulder.build.BuildResult;
 import dtm.bulder.build.TestRunner;
+import dtm.bulder.build.graph.ResolvedTarget;
+import dtm.bulder.build.graph.TargetResolution;
+import dtm.bulder.build.graph.TargetResolver;
 import dtm.bulder.manifest.model.LibraryManifest;
 import dtm.bulder.manifest.model.ManifestRootModel;
 import dtm.bulder.repo.SafeZipExtractor;
@@ -66,7 +69,8 @@ public final class LifecycleExecutor {
 
     private static BuildRequest request(LifecycleContext ctx) {
         return new BuildRequest(ctx.projectPath(), ctx.manifest(), ctx.toolchain(),
-                ctx.buildSystem(), ctx.packagesDir(), ctx.buildDir(), ctx.buildMode(), ctx.output());
+                ctx.buildSystem(), ctx.packagesDir(), ctx.buildDir(), ctx.buildMode(),
+                ctx.output(), ctx.jobs(), ctx.onlyTargets());
     }
 
     private static boolean notBlank(String s) {
@@ -94,24 +98,57 @@ public final class LifecycleExecutor {
         if (manifest == null || !notBlank(idOf(manifest)) || !notBlank(manifest.getVersion())) {
             return LifecycleResult.fail("Install requer 'id' (ou 'name') e 'version' no manifest");
         }
-        String id = idOf(manifest);
+        String projectId = idOf(manifest);
         String version = manifest.getVersion();
-        boolean library = manifest.isLibrary();
-        Path artifact = Artifacts.artifactPath(ctx.projectPath(), manifest, ctx.buildDir(), library);
+        boolean msvc = ctx.toolchain() != null && ctx.toolchain().isMsvc();
 
+        TargetResolution resolution = TargetResolver.resolve(manifest, ctx.projectPath(), msvc);
+        if (!resolution.multiTarget()) {
+            Path artifact = Artifacts.artifactPath(ctx.projectPath(), manifest, ctx.buildDir(),
+                    manifest.isLibrary());
+            return publish(ctx, projectId,
+                    notBlank(manifest.getName()) ? manifest.getName() : projectId,
+                    version, manifest.getDescription(), manifest.getIncludePaths(), artifact);
+        }
+
+        List<String> published = new ArrayList<>();
+        for (ResolvedTarget target : resolution.targets()) {
+            if (!target.type().isLibrary()) {
+                continue;
+            }
+            String packageId = projectId + "-" + target.id();
+            Path artifact = Artifacts.artifactPath(ctx.buildDir(), target.name(),
+                    target.type(), msvc);
+            LifecycleResult one = publish(ctx, packageId, target.name(), version,
+                    manifest.getDescription(), target.includePaths(), artifact);
+            if (!one.success()) {
+                return one;
+            }
+            published.add(packageId);
+        }
+        if (published.isEmpty()) {
+            return LifecycleResult.ok("Install: nenhum target de biblioteca para publicar");
+        }
+        return LifecycleResult.ok("Install concluido (" + String.join(", ", published)
+                + " : " + version + ")");
+    }
+
+    private static LifecycleResult publish(LifecycleContext ctx, String id, String name,
+                                           String version, String description,
+                                           List<String> includePaths, Path artifact) {
         Path content = null;
         try {
             content = Files.createTempDirectory("buildgraph-install-");
 
             LibraryManifest lm = new LibraryManifest();
             lm.setId(id);
-            lm.setName(notBlank(manifest.getName()) ? manifest.getName() : id);
+            lm.setName(notBlank(name) ? name : id);
             lm.setVersion(version);
-            lm.setDescription(manifest.getDescription());
+            lm.setDescription(description);
             lm.setKind(LibraryManifest.KIND_SOURCE);
 
             List<String> includeNames = new ArrayList<>();
-            for (String inc : manifest.getIncludePaths()) {
+            for (String inc : includePaths) {
                 Path src = ctx.projectPath().resolve(inc).normalize();
                 if (!Files.exists(src)) {
                     continue;

@@ -46,7 +46,8 @@ public final class CommandDispatcher {
         }
 
         BuildContext context = new BuildContext(projectPath, args.getRepoPath(),
-                args.getProfile(), args.getCompiler(), args.getPackagesDir(), printer);
+                args.getProfile(), args.getCompiler(), args.getPackagesDir(), printer,
+                args.getJobs(), args.getTargets());
 
         if (args.hasCompileCommands()) {
             try {
@@ -132,6 +133,9 @@ public final class CommandDispatcher {
         printer.println(Severity.NONE, "  --repo/--external  repo adicional; default final: ~/.buildgraph/repository");
         printer.println(Severity.NONE, "  --packages/--out   pasta local (fallback de packagesBase)");
         printer.println(Severity.NONE, "  --compile-commands/--clangd  imprime compile_commands.json no stdout");
+        printer.println(Severity.NONE, "  -t, --target  builda apenas o target indicado (e suas dependencias);");
+        printer.println(Severity.NONE, "                repetivel ou separado por virgula");
+        printer.println(Severity.NONE, "  -j, --jobs    limita o paralelismo entre targets (1 = serial)");
         printer.println(Severity.NONE, "  outputDir default  <projeto>/build");
         printer.println(Severity.NONE, "  precedencia        manifest/profile -> CLI -> defaults");
         printer.println(Severity.NONE, "  install       publica o projeto (id:version) no repo global");

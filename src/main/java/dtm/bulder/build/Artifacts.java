@@ -25,21 +25,27 @@ public final class Artifacts {
         return PathSanitizer.sanitizePackageFolderName(name);
     }
 
+    public static String fileName(String base, TargetType type, boolean msvc) {
+        return switch (type) {
+            case EXECUTABLE -> ToolProbe.isWindows() ? base + ".exe" : base;
+            case SHARED -> {
+                if (ToolProbe.isWindows()) {
+                    yield base + ".dll";
+                }
+                yield MAC ? "lib" + base + ".dylib" : "lib" + base + ".so";
+            }
+            case STATIC -> msvc ? base + ".lib" : "lib" + base + ".a";
+        };
+    }
+
+    public static Path artifactPath(Path buildDir, String base, TargetType type, boolean msvc) {
+        return buildDir.resolve(fileName(PathSanitizer.sanitizePackageFolderName(base), type, msvc));
+    }
+
     public static Path artifactPath(Path projectPath, ManifestRootModel manifest, Path buildDir,
                                     boolean library) {
         String base = baseName(projectPath, manifest);
-        String file;
-        if (library) {
-            if (ToolProbe.isWindows()) {
-                file = base + ".dll";
-            } else if (MAC) {
-                file = "lib" + base + ".dylib";
-            } else {
-                file = "lib" + base + ".so";
-            }
-        } else {
-            file = ToolProbe.isWindows() ? base + ".exe" : base;
-        }
-        return buildDir.resolve(file);
+        return buildDir.resolve(fileName(base, library ? TargetType.SHARED : TargetType.EXECUTABLE,
+                false));
     }
 }

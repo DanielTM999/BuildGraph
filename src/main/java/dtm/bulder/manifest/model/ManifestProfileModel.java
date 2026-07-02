@@ -71,6 +71,10 @@ public class ManifestProfileModel {
     private List<ManifestPackagesModel> packages = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
+    @JacksonXmlElementWrapper(useWrapping = false)
+    private List<ManifestTargetModel> targets = new ArrayList<>();
+
+    @JsonSetter(nulls = Nulls.SKIP)
     private Map<String, String> env = new LinkedHashMap<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
@@ -258,6 +262,14 @@ public class ManifestProfileModel {
 
     public void setPackages(List<ManifestPackagesModel> packages) {
         this.packages = packages != null ? packages : new ArrayList<>();
+    }
+
+    public List<ManifestTargetModel> getTargets() {
+        return targets;
+    }
+
+    public void setTargets(List<ManifestTargetModel> targets) {
+        this.targets = targets != null ? targets : new ArrayList<>();
     }
 
     public Map<String, String> getEnv() {

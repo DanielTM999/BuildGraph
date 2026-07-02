@@ -28,12 +28,18 @@ public final class SourceCollector {
     }
 
     public static List<Path> collectSources(Path projectPath, ManifestRootModel manifest) {
+        List<String> declared = manifest == null ? List.of() : manifest.getSourceFolders();
+        return collectSources(projectPath, declared, true);
+    }
+
+    public static List<Path> collectSources(Path projectPath, List<String> declaredFolders,
+                                            boolean fallback) {
         List<String> folders = new ArrayList<>();
-        if (manifest != null && !manifest.getSourceFolders().isEmpty()) {
-            folders.addAll(manifest.getSourceFolders());
-        } else if (Files.isDirectory(projectPath.resolve("src"))) {
+        if (declaredFolders != null && !declaredFolders.isEmpty()) {
+            folders.addAll(declaredFolders);
+        } else if (fallback && Files.isDirectory(projectPath.resolve("src"))) {
             folders.add("src");
-        } else {
+        } else if (fallback) {
             folders.add(".");
         }
 

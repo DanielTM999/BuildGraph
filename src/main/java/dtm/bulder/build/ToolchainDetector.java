@@ -2,6 +2,7 @@ package dtm.bulder.build;
 
 import dtm.bulder.manifest.model.ManifestRootModel;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -51,6 +52,56 @@ public final class ToolchainDetector {
 
         List<Toolchain> all = detectAll();
         return all.isEmpty() ? null : all.get(0);
+    }
+
+    /**
+     * Localiza o archiver para targets static: llvm-ar/ar ao lado do driver,
+     * depois no PATH; lib.exe para MSVC. Retorna null quando indisponível.
+     */
+    public static Path resolveArchiver(Toolchain toolchain) {
+        if (toolchain == null) {
+            return null;
+        }
+        if (toolchain.isMsvc()) {
+            Path besideDriver = besideDriver(toolchain, "lib");
+            return besideDriver != null ? besideDriver : ToolProbe.findOnPath("lib");
+        }
+        String[] names = toolchain.kind() == ToolchainKind.SYSTEM_CLANG
+                || toolchain.kind() == ToolchainKind.BUNDLED_LLVM
+                ? new String[]{"llvm-ar", "ar"}
+                : new String[]{"ar", "llvm-ar"};
+        for (String name : names) {
+            Path beside = besideDriver(toolchain, name);
+            if (beside != null) {
+                return beside;
+            }
+        }
+        for (String name : names) {
+            Path onPath = ToolProbe.findOnPath(name);
+            if (onPath != null) {
+                return onPath;
+            }
+        }
+        return null;
+    }
+
+    private static Path besideDriver(Toolchain toolchain, String name) {
+        Path driver = toolchain.driver(true);
+        if (driver == null || driver.getParent() == null) {
+            return null;
+        }
+        Path dir = driver.getParent();
+        Path plain = dir.resolve(name);
+        if (Files.isRegularFile(plain)) {
+            return plain;
+        }
+        if (ToolProbe.isWindows()) {
+            Path exe = dir.resolve(name + ".exe");
+            if (Files.isRegularFile(exe)) {
+                return exe;
+            }
+        }
+        return null;
     }
 
     private static Path resolvePath(String exe) {

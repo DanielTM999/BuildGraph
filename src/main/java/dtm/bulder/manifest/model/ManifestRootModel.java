@@ -79,6 +79,10 @@ public class ManifestRootModel {
     @JacksonXmlElementWrapper(useWrapping = false)
     private List<ManifestTaskModel> tasks = new ArrayList<>();
 
+    @JsonSetter(nulls = Nulls.SKIP)
+    @JacksonXmlElementWrapper(useWrapping = false)
+    private List<ManifestTargetModel> targets = new ArrayList<>();
+
     @JsonIgnore
     private boolean packagesDeclared;
 
@@ -304,6 +308,14 @@ public class ManifestRootModel {
 
     public void setTasks(List<ManifestTaskModel> tasks) {
         this.tasks = tasks != null ? tasks : new ArrayList<>();
+    }
+
+    public List<ManifestTargetModel> getTargets() {
+        return targets;
+    }
+
+    public void setTargets(List<ManifestTargetModel> targets) {
+        this.targets = targets != null ? targets : new ArrayList<>();
     }
 
     public boolean isPackagesDeclared() {
