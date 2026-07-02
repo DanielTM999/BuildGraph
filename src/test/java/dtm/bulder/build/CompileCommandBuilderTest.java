@@ -48,4 +48,20 @@ class CompileCommandBuilderTest {
         assertTrue(cmd.contains("-g"));
         assertTrue(cmd.contains("-shared"));
     }
+
+    @Test
+    void buildsLinkCommandFromObjectFiles() {
+        CompileSpec linkSpec = new CompileSpec(
+                new Toolchain(ToolchainKind.GCC, Path.of("gcc"), Path.of("g++")),
+                true, manifest(), false, List.of(Path.of("out/main.o"), Path.of("out/app.o")),
+                Path.of("out/app"), List.of(), List.of(), List.of(), "Debug", List.of(),
+                Path.of("."));
+
+        List<String> cmd = CompileCommandBuilder.buildLinkCommand(linkSpec);
+
+        assertTrue(cmd.contains(Path.of("out/main.o").toString()));
+        assertTrue(cmd.contains(Path.of("out/app.o").toString()));
+        assertTrue(cmd.contains("-o"));
+        assertFalse(cmd.contains("-c"));
+    }
 }

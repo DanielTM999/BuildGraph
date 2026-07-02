@@ -52,23 +52,13 @@ public final class BuildExecutor {
             return BuildResult.fail(1, "Falha ao criar diretorio de build: " + e.getMessage());
         }
 
-        if (!resolution.multiTarget()) {
-            TargetGraph legacy = TargetGraph.of(resolution.targets());
-            ResolvedTarget target = resolution.targets().get(0);
-            progress(req, 0, 1, "Iniciando build");
-            BuildResult result = compileTarget(req, target, legacy, null, req.output());
-            progress(req, 1, 1, "Target " + target.id() + " "
-                    + (result.success() ? "concluido" : "falhou"));
-            return result;
-        }
-
         TargetGraph graph = TargetGraph.of(resolution.targets());
         List<String> cycle = graph.cycle();
         if (!cycle.isEmpty()) {
             return BuildResult.fail(1, "Ciclo entre targets: " + String.join(" -> ", cycle));
         }
 
-        if (!req.onlyTargets().isEmpty()) {
+        if (resolution.multiTarget() && !req.onlyTargets().isEmpty()) {
             for (String id : req.onlyTargets()) {
                 if (graph.target(id.trim()) == null) {
                     return BuildResult.fail(1, "Target desconhecido: " + id.trim());
@@ -88,11 +78,20 @@ public final class BuildExecutor {
             }
         }
 
+        ActionProgress progress = new ActionProgress(actionCount(req.projectPath(), graph),
+                graph.size() > 1, req.output());
+        progress.start();
+
         TargetGraph finalGraph = graph;
         Path finalArchiver = archiver;
+        if (!resolution.multiTarget()) {
+            ResolvedTarget target = graph.targets().iterator().next();
+            return compileTarget(req, target, graph, archiver, req.output(), progress);
+        }
+
         TargetScheduler.Result sched = TargetScheduler.run(graph, req.jobs(),
                 target -> compileTarget(req, target, finalGraph, finalArchiver,
-                        line -> req.output().accept("[" + target.id() + "] " + line)),
+                        line -> req.output().accept("[" + target.id() + "] " + line), progress),
                 req.output());
 
         return summarize(req, sched);
@@ -119,7 +118,7 @@ public final class BuildExecutor {
 
     private static BuildResult compileTarget(BuildRequest req, ResolvedTarget target,
                                              TargetGraph graph, Path archiver,
-                                             Consumer<String> out) {
+                                             Consumer<String> out, ActionProgress progress) {
         ManifestRootModel effective = req.manifest();
         Path projectPath = req.projectPath();
         boolean msvc = req.toolchain().isMsvc();
@@ -167,33 +166,6 @@ public final class BuildExecutor {
 
         boolean cpp = SourceCollector.isCppSources(sources);
         Path artifact = Artifacts.artifactPath(req.buildDir(), target.name(), target.type(), msvc);
-
-        if (target.type() == TargetType.STATIC) {
-            return compileStatic(req, target, targetManifest, sources, cpp, artifact,
-                    archiver, out);
-        }
-
-        List<Path> allSources = new ArrayList<>(sources);
-        allSources.addAll(extraSources);
-        CompileSpec spec = new CompileSpec(
-                req.toolchain(), cpp, targetManifest, target.type() == TargetType.SHARED,
-                allSources, artifact, pkgPaths.includeDirs(), extraLibDirs, extraLinkLibs,
-                req.buildMode(), new ArrayList<>(), projectPath);
-
-        List<String> cmd = CompileCommandBuilder.buildCompileCommand(spec);
-        out.accept("+ " + String.join(" ", cmd));
-        int exit = ProcessRunner.run(cmd, projectPath, targetManifest.getEnv(), out);
-        if (exit == 0) {
-            return BuildResult.ok(exit, artifact, "Artefato gerado: " + artifact);
-        }
-        return BuildResult.fail(exit, "Compilacao falhou (exit " + exit + ")");
-    }
-
-    private static BuildResult compileStatic(BuildRequest req, ResolvedTarget target,
-                                             ManifestRootModel targetManifest, List<Path> sources,
-                                             boolean cpp, Path artifact, Path archiver,
-                                             Consumer<String> out) {
-        boolean msvc = req.toolchain().isMsvc();
         Path objDir = req.buildDir().resolve(".obj").resolve(target.id());
         try {
             Files.createDirectories(objDir);
@@ -210,26 +182,119 @@ public final class BuildExecutor {
             i++;
 
             CompileSpec spec = new CompileSpec(
-                    req.toolchain(), cpp, targetManifest, false,
-                    List.of(source), object, PackagePaths.resolve(req.packagesDir()).includeDirs(),
+                    req.toolchain(), SourceCollector.isCppSources(List.of(source)), targetManifest,
+                    target.type() == TargetType.SHARED, List.of(source), object,
+                    pkgPaths.includeDirs(),
                     List.of(), List.of(), req.buildMode(), new ArrayList<>(), req.projectPath());
             List<String> cmd = CompileCommandBuilder.buildCompileOnlyCommand(spec);
             out.accept("+ " + String.join(" ", cmd));
+            long started = System.nanoTime();
             int exit = ProcessRunner.run(cmd, req.projectPath(), targetManifest.getEnv(), out);
+            progress.compiled(target, req.projectPath(), source, started, exit == 0);
             if (exit != 0) {
                 return BuildResult.fail(exit, "Compilacao falhou em " + source
                         + " (exit " + exit + ")");
             }
         }
 
+        if (target.type() != TargetType.STATIC) {
+            List<Path> linkInputs = new ArrayList<>(objects);
+            linkInputs.addAll(extraSources);
+            CompileSpec spec = new CompileSpec(
+                    req.toolchain(), cpp, targetManifest, target.type() == TargetType.SHARED,
+                    linkInputs, artifact, pkgPaths.includeDirs(), extraLibDirs, extraLinkLibs,
+                    req.buildMode(), new ArrayList<>(), projectPath);
+            List<String> link = CompileCommandBuilder.buildLinkCommand(spec);
+            out.accept("+ " + String.join(" ", link));
+            long started = System.nanoTime();
+            int exit = ProcessRunner.run(link, projectPath, targetManifest.getEnv(), out);
+            progress.linked(target, artifact, started, exit == 0);
+            if (exit == 0) {
+                return BuildResult.ok(exit, artifact, "Artefato gerado: " + artifact);
+            }
+            return BuildResult.fail(exit, "Link falhou (exit " + exit + ")");
+        }
+
         List<String> archive = ArchiverCommandBuilder.buildArchiveCommand(archiver, artifact,
                 objects, msvc);
         out.accept("+ " + String.join(" ", archive));
+        long started = System.nanoTime();
         int exit = ProcessRunner.run(archive, req.projectPath(), targetManifest.getEnv(), out);
+        progress.archived(target, artifact, started, exit == 0);
         if (exit == 0) {
             return BuildResult.ok(exit, artifact, "Artefato gerado: " + artifact);
         }
         return BuildResult.fail(exit, "Archiver falhou (exit " + exit + ")");
+    }
+
+    static int actionCount(Path projectPath, TargetGraph graph) {
+        int total = 0;
+        for (ResolvedTarget target : graph.targets()) {
+            total += SourceCollector.collectSources(projectPath, target.sourceFolders(),
+                    target.synthetic()).size() + 1;
+        }
+        return Math.max(1, total);
+    }
+
+    private static final class ActionProgress {
+
+        private final int total;
+        private final boolean showTarget;
+        private final Consumer<String> output;
+        private int completed;
+
+        private ActionProgress(int total, boolean showTarget, Consumer<String> output) {
+            this.total = total;
+            this.showTarget = showTarget;
+            this.output = output;
+        }
+
+        private synchronized void start() {
+            emit("[0/" + total + "] Iniciando build");
+        }
+
+        private synchronized void compiled(ResolvedTarget target, Path project, Path source,
+                                           long started, boolean success) {
+            String path;
+            try {
+                path = project.toAbsolutePath().normalize()
+                        .relativize(source.toAbsolutePath().normalize()).toString();
+            } catch (IllegalArgumentException e) {
+                path = source.toString();
+            }
+            completed(success ? "Compilado " + path : "Falhou ao compilar " + path,
+                    target, started);
+        }
+
+        private synchronized void linked(ResolvedTarget target, Path artifact,
+                                         long started, boolean success) {
+            completed(success ? "Link concluido: " + artifact.getFileName()
+                    : "Link falhou: " + artifact.getFileName(), target, started);
+        }
+
+        private synchronized void archived(ResolvedTarget target, Path artifact,
+                                           long started, boolean success) {
+            completed(success ? "Archive concluido: " + artifact.getFileName()
+                    : "Archive falhou: " + artifact.getFileName(), target, started);
+        }
+
+        private void completed(String message, ResolvedTarget target, long started) {
+            completed++;
+            String targetLabel = showTarget ? "[" + target.id() + "] " : "";
+            emit("[" + completed + "/" + total + "] " + targetLabel + message
+                    + " (" + elapsed(started) + ")");
+        }
+
+        private String elapsed(long started) {
+            double seconds = (System.nanoTime() - started) / 1_000_000_000.0;
+            return String.format(java.util.Locale.ROOT, "%.3f s", seconds);
+        }
+
+        private void emit(String message) {
+            if (output != null) {
+                output.accept(message);
+            }
+        }
     }
 
     private static List<ResolvedTarget> transitiveDependencies(TargetGraph graph,

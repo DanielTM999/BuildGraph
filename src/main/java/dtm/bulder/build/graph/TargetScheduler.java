@@ -27,20 +27,16 @@ public final class TargetScheduler {
 
     public static Result run(TargetGraph graph, int jobs, TargetBuilder builder,
                              Consumer<String> info) {
-        Progress progress = new Progress(graph.size(), info);
-        progress.start();
-
         int limit = jobs > 0 ? jobs : Runtime.getRuntime().availableProcessors();
         limit = Math.max(1, Math.min(limit, graph.size()));
 
         if (limit == 1) {
-            return runSerial(graph, builder, progress);
+            return runSerial(graph, builder);
         }
-        return runParallel(graph, limit, builder, info, progress);
+        return runParallel(graph, limit, builder, info);
     }
 
-    private static Result runSerial(TargetGraph graph, TargetBuilder builder,
-                                    Progress progress) {
+    private static Result runSerial(TargetGraph graph, TargetBuilder builder) {
         Map<String, BuildResult> results = new LinkedHashMap<>();
         boolean success = true;
         for (ResolvedTarget target : graph.topologicalOrder()) {
@@ -49,14 +45,13 @@ public final class TargetScheduler {
             }
             BuildResult r = safeBuild(builder, target);
             results.put(target.id(), r);
-            progress.completed(target, r);
             success = r.success();
         }
         return new Result(results, skippedIds(graph, results), success);
     }
 
     private static Result runParallel(TargetGraph graph, int limit, TargetBuilder builder,
-                                      Consumer<String> info, Progress progress) {
+                                      Consumer<String> info) {
         Object lock = new Object();
         Map<String, BuildResult> results = new LinkedHashMap<>();
         Set<String> done = new HashSet<>();
@@ -68,8 +63,7 @@ public final class TargetScheduler {
         try {
             synchronized (lock) {
                 info.accept("Build paralelo com " + limit + " jobs");
-                scheduleReady(graph, pool, builder, lock, results, done, started, running, failed,
-                        progress);
+                scheduleReady(graph, pool, builder, lock, results, done, started, running, failed);
                 while (running[0] > 0 || (!failed[0] && done.size() < graph.size())) {
                     try {
                         lock.wait();
@@ -93,8 +87,7 @@ public final class TargetScheduler {
     private static void scheduleReady(TargetGraph graph, ExecutorService pool,
                                       TargetBuilder builder, Object lock,
                                       Map<String, BuildResult> results, Set<String> done,
-                                      Set<String> started, int[] running, boolean[] failed,
-                                      Progress progress) {
+                                      Set<String> started, int[] running, boolean[] failed) {
         if (failed[0]) {
             return;
         }
@@ -105,12 +98,11 @@ public final class TargetScheduler {
                 BuildResult r = safeBuild(builder, target);
                 synchronized (lock) {
                     results.put(target.id(), r);
-                    progress.completed(target, r);
                     running[0]--;
                     if (r.success()) {
                         done.add(target.id());
                         scheduleReady(graph, pool, builder, lock, results, done, started,
-                                running, failed, progress);
+                                running, failed);
                     } else {
                         failed[0] = true;
                     }
@@ -138,31 +130,4 @@ public final class TargetScheduler {
         return skipped;
     }
 
-    private static final class Progress {
-
-        private final int total;
-        private final Consumer<String> output;
-        private int completed;
-
-        private Progress(int total, Consumer<String> output) {
-            this.total = total;
-            this.output = output;
-        }
-
-        private synchronized void start() {
-            emit("[0/" + total + "] Iniciando build");
-        }
-
-        private synchronized void completed(ResolvedTarget target, BuildResult result) {
-            completed++;
-            String status = result.success() ? "concluido" : "falhou";
-            emit("[" + completed + "/" + total + "] Target " + target.id() + " " + status);
-        }
-
-        private void emit(String message) {
-            if (output != null) {
-                output.accept(message);
-            }
-        }
-    }
 }

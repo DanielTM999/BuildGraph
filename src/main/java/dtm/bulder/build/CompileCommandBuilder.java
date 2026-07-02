@@ -15,6 +15,10 @@ public final class CompileCommandBuilder {
         return buildCommand(spec, false);
     }
 
+    public static List<String> buildLinkCommand(CompileSpec spec) {
+        return buildCommand(spec, false);
+    }
+
     public static List<String> buildCompileOnlyCommand(CompileSpec spec) {
         return buildCommand(spec, true);
     }

@@ -18,6 +18,7 @@ public final class BuildDiagnosticParser {
             Pattern.compile(".+\\(\\d+(,\\d+)?\\):\\s*(error|warning)\\b.*");
 
     private static final Pattern CMAKE = Pattern.compile("\\s*CMake (Error|Warning)\\b.*");
+    private static final Pattern PROGRESS = Pattern.compile("\\s*\\[\\d+/\\d+]\\s+.*");
 
     private BuildDiagnosticParser() {
     }
@@ -27,6 +28,9 @@ public final class BuildDiagnosticParser {
             return Level.PLAIN;
         }
         String lower = line.toLowerCase();
+        if (PROGRESS.matcher(line).matches()) {
+            return Level.NOTE;
+        }
         if (GCC_CLANG.matcher(line).matches() || MSVC.matcher(line).matches()
                 || CMAKE.matcher(line).matches()) {
             if (lower.contains("error")) {
