@@ -33,6 +33,7 @@ class ManifestParserTest {
               "cxxStandard": "cpp20",
               "sourceFolders": ["src"],
               "testFolder": "specs",
+              "testMain": "TestMain.cpp",
               "includePaths": ["include"],
               "defines": ["APP=1"],
               "packages": [ { "id": "fmt", "version": "10.2.1" } ],
@@ -53,6 +54,7 @@ class ManifestParserTest {
         assertEquals("1.0.0", m.getVersion());
         assertEquals(java.util.List.of("src"), m.getSourceFolders());
         assertEquals("specs", m.getTestFolder());
+        assertEquals("TestMain.cpp", m.getTestMain());
         assertEquals(1, m.getPackages().size());
         assertEquals("fmt", m.getPackages().get(0).getId());
         assertTrue(m.getProfiles().containsKey("dev"));

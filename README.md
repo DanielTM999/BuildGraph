@@ -44,6 +44,7 @@ java -jar BuildGraph.jar --help
 buildgraph [projectPath] [clean] [build] [test] [install] [refresh]
            [--interactive] [-f raw|json|xml]
            [-p profile] [-c compiler]
+           [--test-main arquivo]
            [-t target] [-j jobs]
            [--repo caminho] [--packages caminho] [--compile-commands]
 ```
@@ -61,6 +62,7 @@ BuildGraph executa `build`.
 | `--interactive` | Monitora o manifest e aceita comandos pela entrada padrão. |
 | `-p`, `--profile` | Profile usado somente quando o manifest não define `activeProfile`. |
 | `-c`, `--compiler` | Compilador usado somente quando o manifest não define compiladores. |
+| `--test-main` | Arquivo que define `main()`, relativo a `testFolder`; fallback de `testMain`. |
 | `--repo`, `--external` | Repositório adicional, depois dos repositórios do manifest. |
 | `--packages`, `--out` | Pasta local usada quando `packagesBase` não está configurado. |
 | `--compile-commands`, `--clangd` | Imprime um `compile_commands.json` resolvido no stdout e encerra. |
@@ -87,7 +89,8 @@ BuildGraph . refresh --repo D:/buildgraph-repository
 ```
 
 As fases solicitadas são sempre ordenadas como `clean → build → test → install`, mesmo que tenham
-sido escritas em outra ordem. `test` e `install` também implicam `build`.
+sido escritas em outra ordem. `install` implica `build`; `test` também implica `build` para sistemas
+externos e manifests multi-target.
 
 Durante o build, o progresso é exibido como `[atual/total]`, começando em `[0/n]`. Em builds
 diretos, cada fonte compilada e a etapa final de link/archive contam como uma unidade e mostram
@@ -311,6 +314,7 @@ Campos desconhecidos são ignorados. Listas e mapas nulos são tratados como vaz
 | `sysroot` | string | Caminho passado como `--sysroot` em compiladores compatíveis. |
 | `sourceFolders` | string[] | Pastas de fontes C/C++ relativas ao projeto. |
 | `testFolder` | string | Pasta de fontes de teste relativa ao projeto. Ausente ou vazia usa `<projeto>/tests`. |
+| `testMain` | string | Arquivo com `main()`, relativo a `testFolder`. Ausente ou vazio procura exatamente um `main()` na pasta. |
 | `includePaths` | string[] | Pastas de headers adicionadas à linha de compilação. |
 | `defines` | string[] | Macros; `-D` ou `/D` é acrescentado quando necessário. |
 | `compileFlags` | string[] | Argumentos extras inseridos na compilação. |

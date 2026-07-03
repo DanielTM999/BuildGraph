@@ -58,6 +58,11 @@ public final class TestRunner {
         if (testSources.isEmpty()) {
             return BuildResult.ok(0, null, "Nenhum teste encontrado");
         }
+        TestMainResolver.Result testMain = TestMainResolver.resolve(
+                projectPath, manifest, testSources);
+        if (!testMain.success()) {
+            return BuildResult.fail(1, testMain.error());
+        }
         if (req.toolchain() == null) {
             return BuildResult.fail(1, "Nenhuma toolchain C/C++ encontrada");
         }
@@ -156,6 +161,7 @@ public final class TestRunner {
         out.setCxxCompiler(manifest.getCxxCompiler());
         out.setSysroot(manifest.getSysroot());
         out.setTestFolder(manifest.getTestFolder());
+        out.setTestMain(manifest.getTestMain());
         out.setSourceFolders(new ArrayList<>(manifest.getSourceFolders()));
         out.setIncludePaths(new ArrayList<>(manifest.getIncludePaths()));
         out.setDefines(new ArrayList<>(manifest.getDefines()));

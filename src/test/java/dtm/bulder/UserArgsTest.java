@@ -76,4 +76,14 @@ class UserArgsTest {
         UserArgs a = new UserArgs(new String[]{"/p", "--bogus"});
         assertTrue(a.isInvalidCommand());
     }
+
+    @Test
+    void parsesTestMainAndRejectsMissingValue() {
+        UserArgs configured = new UserArgs(new String[]{"test", "--test-main", "TestMain.cpp"});
+        assertEquals("TestMain.cpp", configured.getTestMain());
+        assertFalse(configured.isInvalidCommand());
+
+        UserArgs missing = new UserArgs(new String[]{"test", "--test-main"});
+        assertTrue(missing.isInvalidCommand());
+    }
 }

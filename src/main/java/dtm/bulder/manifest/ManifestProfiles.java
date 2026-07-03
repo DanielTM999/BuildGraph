@@ -108,6 +108,7 @@ public final class ManifestProfiles {
                 profile == null ? null : profile.getPackagesBase()));
         out.setActiveProfile(raw.getActiveProfile());
         out.setTestFolder(raw.getTestFolder());
+        out.setTestMain(raw.getTestMain());
 
         boolean library = raw.isLibrary();
         if (profile != null && profile.getLibrary() != null) {

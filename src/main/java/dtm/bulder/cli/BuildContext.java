@@ -46,6 +46,7 @@ public final class BuildContext {
     private final Printer printer;
     private final int jobs;
     private final java.util.List<String> onlyTargets;
+    private final String testMainOverride;
 
     public BuildContext(Path projectPath, String repoOverride, String profileOverride,
                         String compilerOverride, String packagesOverride, Printer printer) {
@@ -56,6 +57,13 @@ public final class BuildContext {
     public BuildContext(Path projectPath, String repoOverride, String profileOverride,
                         String compilerOverride, String packagesOverride, Printer printer,
                         int jobs, java.util.List<String> onlyTargets) {
+        this(projectPath, repoOverride, profileOverride, compilerOverride, packagesOverride,
+                printer, jobs, onlyTargets, null);
+    }
+
+    public BuildContext(Path projectPath, String repoOverride, String profileOverride,
+                        String compilerOverride, String packagesOverride, Printer printer,
+                        int jobs, java.util.List<String> onlyTargets, String testMainOverride) {
         this.projectPath = ProjectManifestFiles.normalizeRoot(projectPath);
         this.repoOverride = repoOverride;
         this.profileOverride = profileOverride;
@@ -64,6 +72,7 @@ public final class BuildContext {
         this.printer = printer;
         this.jobs = jobs;
         this.onlyTargets = onlyTargets == null ? java.util.List.of() : onlyTargets;
+        this.testMainOverride = testMainOverride;
     }
 
     public Path projectPath() {
@@ -309,6 +318,9 @@ public final class BuildContext {
             raw.setActiveProfile(profileOverride);
         }
         ManifestRootModel effective = ManifestProfiles.effective(raw);
+        if (!notBlank(effective.getTestMain()) && notBlank(testMainOverride)) {
+            effective.setTestMain(testMainOverride.trim());
+        }
         GlobalRepository repository = GlobalRepository.resolve(projectPath,
                 effective.getRepositories(), repoOverride);
         ManifestResolver resolver = new ManifestResolver(projectPath, repository);

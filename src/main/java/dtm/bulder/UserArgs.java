@@ -16,6 +16,7 @@ public final class UserArgs {
     public static final String COMPILE_COMMANDS = "compile_commands";
     public static final String TARGETS = "targets";
     public static final String JOBS = "jobs";
+    public static final String TEST_MAIN = "test_main";
 
     public static final String HAS_HELP = "has_help";
     public static final String INVALID_COMMAND = "invalid_command";
@@ -66,6 +67,14 @@ public final class UserArgs {
 
     public boolean hasCompiler() {
         return argsMap.containsKey(COMPILER);
+    }
+
+    public String getTestMain() {
+        return argsMap.getOrDefault(TEST_MAIN, "");
+    }
+
+    public boolean hasTestMain() {
+        return argsMap.containsKey(TEST_MAIN);
     }
 
     public String getRepoPath() {
@@ -208,6 +217,12 @@ public final class UserArgs {
                 case "-f", "-format", "--format" -> i = readValue(args, i, FORMAT);
                 case "-p", "-profile", "--profile" -> i = readValue(args, i, PROFILE);
                 case "-c", "-compiler", "--compiler" -> i = readValue(args, i, COMPILER);
+                case "--test-main" -> {
+                    i = readValue(args, i, TEST_MAIN);
+                    if (argsMap.getOrDefault(TEST_MAIN, "").isBlank()) {
+                        invalid("--test-main requer um arquivo");
+                    }
+                }
                 case "--repo", "--external", "-repo" -> i = readValue(args, i, REPO);
                 case "--packages", "--out", "-o" -> i = readValue(args, i, PACKAGES);
                 case "--target", "-t", "--targets" -> i = appendValue(args, i, TARGETS);

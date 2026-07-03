@@ -47,7 +47,7 @@ public final class CommandDispatcher {
 
         BuildContext context = new BuildContext(projectPath, args.getRepoPath(),
                 args.getProfile(), args.getCompiler(), args.getPackagesDir(), printer,
-                args.getJobs(), args.getTargets());
+                args.getJobs(), args.getTargets(), args.getTestMain());
 
         if (args.hasCompileCommands()) {
             try {
@@ -121,7 +121,9 @@ public final class CommandDispatcher {
         printer.println(Severity.NONE,
                 "                [--interactive] [-f <fmt>] [-p <profile>] [-c <compiler>]");
         printer.println(Severity.NONE,
-                "                [--repo <path>] [--packages <dir>] [--compile-commands]");
+                "                [--repo <path>] [--packages <dir>] [--test-main <file>]");
+        printer.println(Severity.NONE,
+                "                [--compile-commands]");
         printer.println(Severity.NONE, "");
         printer.println(Severity.NONE, "  projectPath   diretorio do projeto (default: diretorio atual)");
         printer.println(Severity.NONE, "  clean/build/install/test  fases do lifecycle (default: build)");
@@ -130,6 +132,7 @@ public final class CommandDispatcher {
         printer.println(Severity.NONE, "  -f, --format  raw | json | xml");
         printer.println(Severity.NONE, "  -p, --profile profile ativo (fallback do manifest)");
         printer.println(Severity.NONE, "  -c, --compiler compilador C/C++ (fallback do manifest)");
+        printer.println(Severity.NONE, "  --test-main   arquivo com main() (fallback de testMain)");
         printer.println(Severity.NONE, "  --repo/--external  repo adicional; default final: ~/.buildgraph/repository");
         printer.println(Severity.NONE, "  --packages/--out   pasta local (fallback de packagesBase)");
         printer.println(Severity.NONE, "  --compile-commands/--clangd  imprime compile_commands.json no stdout");
