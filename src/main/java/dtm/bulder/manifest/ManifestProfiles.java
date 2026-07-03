@@ -107,6 +107,7 @@ public final class ManifestProfiles {
         out.setPackagesBase(ManifestMerge.pick(raw.getPackagesBase(),
                 profile == null ? null : profile.getPackagesBase()));
         out.setActiveProfile(raw.getActiveProfile());
+        out.setTestFolder(raw.getTestFolder());
 
         boolean library = raw.isLibrary();
         if (profile != null && profile.getLibrary() != null) {

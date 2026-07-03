@@ -53,13 +53,13 @@ public final class SourceCollector {
         return out;
     }
 
-    public static List<Path> collectTestSources(Path projectPath) {
+    public static List<Path> collectTestSources(Path projectPath, ManifestRootModel manifest) {
+        String declared = manifest == null ? null : manifest.getTestFolder();
+        String folder = declared == null || declared.isBlank() ? "tests" : declared.trim();
         List<Path> out = new ArrayList<>();
-        for (String folder : List.of("test", "tests")) {
-            Path dir = projectPath.resolve(folder);
-            if (Files.isDirectory(dir)) {
-                collect(dir, out);
-            }
+        Path dir = projectPath.resolve(folder).normalize();
+        if (Files.isDirectory(dir)) {
+            collect(dir, out);
         }
         return out;
     }

@@ -30,7 +30,7 @@ public final class LifecycleExecutor {
         EnumSet<Phase> phases = EnumSet.noneOf(Phase.class);
         phases.addAll(requested);
         for (Phase p : requested) {
-            if (p.impliesBuild()) {
+            if (p.impliesBuild() || (p == Phase.TEST && testRequiresBuild(ctx))) {
                 phases.add(Phase.BUILD);
             }
         }
@@ -56,6 +56,14 @@ public final class LifecycleExecutor {
             }
         }
         return LifecycleResult.ok("Lifecycle concluido");
+    }
+
+    static boolean testRequiresBuild(LifecycleContext ctx) {
+        return switch (ctx.buildSystem()) {
+            case CMAKE, MESON, MAKE -> true;
+            case MANIFEST, DEFAULT -> TargetResolver.resolve(ctx.manifest(), ctx.projectPath(),
+                    ctx.toolchain() != null && ctx.toolchain().isMsvc()).multiTarget();
+        };
     }
 
     private static LifecycleResult runStep(LifecycleContext ctx, Phase phase) {

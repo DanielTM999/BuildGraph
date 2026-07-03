@@ -33,6 +33,7 @@ public class ManifestRootModel {
     private String outputDir;
     private String packagesBase;
     private String activeProfile;
+    private String testFolder;
 
     @JsonSetter(nulls = Nulls.SKIP)
     @JacksonXmlElementWrapper(useWrapping = false)
@@ -212,6 +213,14 @@ public class ManifestRootModel {
 
     public void setActiveProfile(String activeProfile) {
         this.activeProfile = activeProfile;
+    }
+
+    public String getTestFolder() {
+        return testFolder;
+    }
+
+    public void setTestFolder(String testFolder) {
+        this.testFolder = testFolder;
     }
 
     public List<String> getRepositories() {

@@ -310,6 +310,7 @@ Campos desconhecidos são ignorados. Listas e mapas nulos são tratados como vaz
 | `toolchainVersion` | string | Metadata de versão da toolchain disponível para profiles/placeholders. |
 | `sysroot` | string | Caminho passado como `--sysroot` em compiladores compatíveis. |
 | `sourceFolders` | string[] | Pastas de fontes C/C++ relativas ao projeto. |
+| `testFolder` | string | Pasta de fontes de teste relativa ao projeto. Ausente ou vazia usa `<projeto>/tests`. |
 | `includePaths` | string[] | Pastas de headers adicionadas à linha de compilação. |
 | `defines` | string[] | Macros; `-D` ou `/D` é acrescentado quando necessário. |
 | `compileFlags` | string[] | Argumentos extras inseridos na compilação. |

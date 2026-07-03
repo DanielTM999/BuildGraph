@@ -19,6 +19,6 @@ public enum Phase {
     }
 
     public boolean impliesBuild() {
-        return this == TEST || this == INSTALL;
+        return this == INSTALL;
     }
 }

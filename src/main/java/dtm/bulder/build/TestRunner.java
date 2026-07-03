@@ -54,7 +54,7 @@ public final class TestRunner {
         Path projectPath = req.projectPath();
         ManifestRootModel manifest = req.manifest();
 
-        List<Path> testSources = SourceCollector.collectTestSources(projectPath);
+        List<Path> testSources = SourceCollector.collectTestSources(projectPath, manifest);
         if (testSources.isEmpty()) {
             return BuildResult.ok(0, null, "Nenhum teste encontrado");
         }
@@ -155,6 +155,7 @@ public final class TestRunner {
         out.setCCompiler(manifest.getCCompiler());
         out.setCxxCompiler(manifest.getCxxCompiler());
         out.setSysroot(manifest.getSysroot());
+        out.setTestFolder(manifest.getTestFolder());
         out.setSourceFolders(new ArrayList<>(manifest.getSourceFolders()));
         out.setIncludePaths(new ArrayList<>(manifest.getIncludePaths()));
         out.setDefines(new ArrayList<>(manifest.getDefines()));

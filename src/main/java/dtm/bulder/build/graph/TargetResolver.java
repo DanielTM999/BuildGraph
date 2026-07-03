@@ -93,6 +93,7 @@ public final class TargetResolver {
         out.setOutputDir(effective.getOutputDir());
         out.setPackagesBase(effective.getPackagesBase());
         out.setActiveProfile(effective.getActiveProfile());
+        out.setTestFolder(effective.getTestFolder());
         out.setRepositories(new ArrayList<>(effective.getRepositories()));
         out.setSourceFolders(new ArrayList<>(target.sourceFolders()));
         out.setIncludePaths(new ArrayList<>(target.includePaths()));
