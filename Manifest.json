@@ -1,0 +1,27 @@
+{
+  "id": "exemplo-copia-build",
+  "name": "exemplo-copia-build",
+  "version": "1.0.0",
+  "outputDir": "build",
+  "sourceFolders": ["src"],
+  "properties": {
+    "buildDir": "build",
+    "publishDir": "x"
+  },
+  "tasks": [
+    {
+      "id": "recriar-e-copiar-build",
+      "phase": "build",
+      "when": "after",
+      "order": 10,
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "$source = '${properties.buildDir}'; $target = '${properties.publishDir}'; if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force }; New-Item -ItemType Directory -Path $target -Force | Out-Null; if (Test-Path -LiteralPath $source) { Copy-Item -Path (Join-Path $source '*') -Destination $target -Recurse -Force }"
+      ],
+      "workingDir": "${project.dir}",
+      "failOnError": true
+    }
+  ]
+}

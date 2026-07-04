@@ -618,6 +618,28 @@ fase/posição; `order` desempata as tarefas disponíveis. Um ciclo gera aviso e
 declarada. `failOnError` é `true` por padrão; quando `false`, o lifecycle continua após uma saída
 não zero.
 
+No XML, `tasks` é o bloco da coleção e cada item usa o elemento `task`:
+
+```xml
+<tasks>
+  <task>
+    <id>prepare</id>
+    <phase>build</phase>
+    <when>after</when>
+    <command>generator</command>
+    <args>--output</args>
+    <args>${properties.generatedDir}</args>
+  </task>
+  <task>
+    <id>publish</id>
+    <phase>build</phase>
+    <when>after</when>
+    <dependsOn>prepare</dependsOn>
+    <command>publisher</command>
+  </task>
+</tasks>
+```
+
 São suportados placeholders como
 `${project.dir}`, `${project.id}`, `${project.version}`, `${env.NOME}`,
 `${properties.chave}` e `${profile.current.propriedade}`.

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
+import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
 
 import java.util.ArrayList;
@@ -78,7 +79,8 @@ public class ManifestRootModel {
     private List<ManifestPackagesModel> packages = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
-    @JacksonXmlElementWrapper(useWrapping = false)
+    @JacksonXmlElementWrapper(localName = "tasks")
+    @JacksonXmlProperty(localName = "task")
     private List<ManifestTaskModel> tasks = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)

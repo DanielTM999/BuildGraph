@@ -75,6 +75,23 @@ class ManifestParserTest {
                     <id>fmt</id>
                     <version>10.2.1</version>
                   </packages>
+                  <tasks>
+                    <task>
+                      <id>prepare</id>
+                      <phase>build</phase>
+                      <when>after</when>
+                      <command>echo</command>
+                      <args>prepare</args>
+                    </task>
+                    <task>
+                      <id>publish</id>
+                      <phase>build</phase>
+                      <when>after</when>
+                      <dependsOn>prepare</dependsOn>
+                      <command>echo</command>
+                      <args>publish</args>
+                    </task>
+                  </tasks>
                 </Manifest>
                 """;
         ManifestParseResult result = ManifestParser.readManifest(xml, true);
@@ -85,6 +102,9 @@ class ManifestParserTest {
         assertEquals(java.util.List.of("src", "lib"), m.getSourceFolders());
         assertEquals(1, m.getPackages().size());
         assertEquals("fmt", m.getPackages().get(0).getId());
+        assertEquals(2, m.getTasks().size());
+        assertEquals("prepare", m.getTasks().get(0).getId());
+        assertEquals("publish", m.getTasks().get(1).getId());
     }
 
     @Test
