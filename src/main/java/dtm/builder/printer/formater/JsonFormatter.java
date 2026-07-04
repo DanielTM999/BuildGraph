@@ -1,0 +1,39 @@
+package dtm.builder.printer.formater;
+
+import dtm.builder.printer.Severity;
+
+public final class JsonFormatter implements Formatter {
+
+    @Override
+    public String format(Severity severity, Object o, Object... args) {
+        Severity sev = severity != null ? severity : Severity.INFO;
+        String message = MessageRenderer.render(o, args);
+        return "{\"severity\":\"" + sev.name() + "\","
+                + "\"message\":\"" + escape(message) + "\","
+                + "\"ts\":" + System.currentTimeMillis() + "}";
+    }
+
+    private static String escape(String s) {
+        StringBuilder sb = new StringBuilder(s.length() + 8);
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '"' -> sb.append("\\\"");
+                case '\\' -> sb.append("\\\\");
+                case '\n' -> sb.append("\\n");
+                case '\r' -> sb.append("\\r");
+                case '\t' -> sb.append("\\t");
+                case '\b' -> sb.append("\\b");
+                case '\f' -> sb.append("\\f");
+                default -> {
+                    if (c < 0x20) {
+                        sb.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        sb.append(c);
+                    }
+                }
+            }
+        }
+        return sb.toString();
+    }
+}

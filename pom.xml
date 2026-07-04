@@ -4,9 +4,9 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>dtm.bulder</groupId>
+    <groupId>dtm.builder</groupId>
     <artifactId>BuildGraph</artifactId>
-    <version>1.0.0</version>
+    <version>${revision}</version>
     <name>BuildGraph</name>
     <description>Build system for C and C++ projects</description>
 
@@ -19,11 +19,12 @@
     </licenses>
 
     <properties>
+        <revision>1.0.0-SNAPSHOT</revision>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <jackson.version>2.18.2</jackson.version>
         <junit.version>5.11.3</junit.version>
-        <main.class>dtm.bulder.Main</main.class>
+        <main.class>dtm.builder.Main</main.class>
     </properties>
 
     <dependencies>

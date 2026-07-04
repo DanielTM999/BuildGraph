@@ -8,6 +8,7 @@ profiles incrementais, resolução de packages, tarefas de lifecycle e repositó
 
 - [Download](#download)
 - [Uso da CLI](#uso)
+- [Compilação incremental](#compilação-incremental)
 - [Modo interativo](#modo-interativo)
 - [Integração com clangd](#integração-com-clangd)
 - [Formatos de saída](#formatos-de-saída-e-exit-codes)
@@ -18,12 +19,13 @@ profiles incrementais, resolução de packages, tarefas de lifecycle e repositó
 - [Fontes, testes e artefatos](#fontes-testes-e-artefatos)
 - [Lifecycle e instalação](#lifecycle-e-instalação)
 - [Build a partir do código-fonte](#build-a-partir-do-código-fonte)
+- [Versionamento e releases](#versionamento-e-releases)
 - [Licença](#licença)
 
 ## Download
 
-Os pacotes para Windows, Linux e macOS são gerados automaticamente a cada push e publicados em
-uma tag e uma GitHub Release. Baixe a versão mais recente na página de
+Os pacotes para Windows, Linux e macOS são gerados automaticamente para tags SemVer (`v1.2.3`) e
+publicados em uma GitHub Release. Baixe a versão mais recente na página de
 [Releases](../../releases/latest). Os pacotes produzidos por `jpackage` já incluem o runtime Java.
 
 Depois de extrair:
@@ -47,6 +49,7 @@ buildgraph [projectPath] [clean] [build] [test] [install] [refresh]
            [--test-main arquivo]
            [-t target] [-j jobs]
            [--repo caminho] [--packages caminho] [--compile-commands]
+           [--no-incremental]
 ```
 
 Se `projectPath` não for informado, o diretório atual será usado. Sem uma fase explícita,
@@ -68,6 +71,7 @@ BuildGraph executa `build`.
 | `--compile-commands`, `--clangd` | Imprime um `compile_commands.json` resolvido no stdout e encerra. |
 | `-t`, `--target` | Builda apenas o target indicado e suas dependências. Repetível ou separado por vírgula. |
 | `-j`, `--jobs` | Limita o paralelismo entre targets (`-j 1` = serial). Default: número de CPUs. |
+| `--no-incremental` | Ignora o estado incremental, recompila todas as fontes e regrava o cache. |
 
 Exemplos:
 
@@ -86,6 +90,9 @@ BuildGraph . test --profile debug
 
 # Usa um repositório adicional
 BuildGraph . refresh --repo D:/buildgraph-repository
+
+# Força recompilação completa sem apagar outros arquivos do outputDir
+BuildGraph . build --no-incremental
 ```
 
 As fases solicitadas são sempre ordenadas como `clean → build → test → install`, mesmo que tenham
@@ -96,6 +103,31 @@ Durante o build, o progresso é exibido como `[atual/total]`, começando em `[0/
 diretos, cada fonte compilada e a etapa final de link/archive contam como uma unidade e mostram
 sua duração. O mesmo formato é usado nos modos normal e interativo, inclusive com targets
 executados em paralelo.
+
+### Compilação incremental
+
+Builds diretos por manifest ou descoberta automática são incrementais por padrão. O estado fica em
+`<outputDir>/.buildgraph-state`: cada objeto é invalidado quando mudam o conteúdo da fonte ou de
+um header, o comando de compilação, o modo de build ou a toolchain. GCC/Clang geram dependências
+com `-MMD -MF`; MSVC usa `/showIncludes`. O link/archive só é repetido quando os objetos, uma
+biblioteca dependente ou o comando de link mudam. `clean` remove também esse estado.
+
+```shell
+# Primeiro build: compila e linka normalmente
+BuildGraph . build
+
+# Sem mudanças: reutiliza objetos e artefato
+BuildGraph . build
+
+# Ignora o estado nesta execução, recompila tudo e grava um estado novo
+BuildGraph . build --no-incremental
+
+# Remove outputDir, incluindo objetos e estado incremental, antes do build
+BuildGraph . clean build
+```
+
+CMake, Meson e Make continuam responsáveis pela própria incrementalidade; `--no-incremental`
+controla somente a compilação direta executada pelo BuildGraph.
 
 ## Modo interativo
 
@@ -110,7 +142,12 @@ Também aceita as opções normais:
 
 ```shell
 BuildGraph . --interactive --format json --profile debug --repo D:/packages
+BuildGraph . --interactive --no-incremental
 ```
+
+No primeiro comando, cada `build` usa o cache incremental. No segundo, todos os builds daquela
+sessão recompilam as fontes; a opção é definida ao iniciar a sessão e não pode ser alternada por um
+comando interativo.
 
 Ao iniciar, o modo interativo:
 
@@ -131,6 +168,19 @@ Ao iniciar, o modo interativo:
 | `compile-commands`, `clangd` ou `compdb` | Emite a compilation database resolvida como JSON bruto. |
 | `help` ou `?` | Mostra os comandos aceitos. |
 | `quit`, `exit` ou `q` | Encerra a sessão. |
+
+Exemplo de ciclo incremental dentro da sessão:
+
+```text
+> build
+> build
+> clean build
+> refresh
+> quit
+```
+
+O segundo `build` reutiliza os resultados do primeiro quando não houve mudanças. `clean build`
+força um rebuild ao remover o diretório de saída e seu estado incremental.
 
 Linhas vazias são ignoradas. Um comando desconhecido gera um aviso e mantém a sessão aberta.
 
@@ -481,10 +531,33 @@ Cada package declarado aceita:
 | Campo | Obrigatório | Finalidade |
 | --- | --- | --- |
 | `id` | sim | Identificador do package. |
-| `version` | sim para resolução atual | Versão exata pesquisada no repositório. |
+| `version` | não | Versão exata. Pode ser usada sozinha ou junto de `versionConstraint`. |
 | `downloadUrl` | quando ainda não instalado | URL de um ZIP que será baixado e normalizado. |
-| `versionConstraint` | não | Metadata de restrição; a resolução atual utiliza `version`. |
-| `transitive` | não | Metadata de dependência transitiva; padrão `true`. |
+| `versionConstraint` | não | Versão exata ou range (`[1.0,2.0)`, `>=1.2 <2.0`, `^1.2.3`, `~1.2`, `1.4.x`). |
+| `transitive` | não | Propaga dependências declaradas no `Manifest.json` da biblioteca; padrão `true`. |
+
+Exemplo com versão exata, range e bloqueio de transitividade:
+
+```json
+{
+  "packages": [
+    {
+      "id": "fmt",
+      "versionConstraint": "[10.0,12.0)"
+    },
+    {
+      "id": "zlib",
+      "version": "1.3.1",
+      "downloadUrl": "https://example.org/zlib-1.3.1.zip",
+      "transitive": false
+    }
+  ]
+}
+```
+
+São aceitas versões exatas e constraints como `[1.0,2.0)`, `>=1.2 <2.0`, `^1.2.3`, `~1.2` e
+`1.4.x`. Quando mais de uma dependência restringe o mesmo package, o resolvedor tenta uma versão
+que satisfaça todas as origens e retorna erro explícito se não houver solução.
 
 O layout do repositório é:
 
@@ -494,10 +567,30 @@ O layout do repositório é:
 └── lib/
 ```
 
-Para resolução, BuildGraph procura primeiro uma variante específica solicitada internamente,
-depois `source` e por fim a primeira variante válida. Se o package não existir em nenhum
+Para resolução, BuildGraph escolhe a maior versão instalada que satisfaça todas as constraints,
+propaga as dependências da biblioteca e interrompe com um erro que identifica as origens quando
+há conflito. Em seguida procura primeiro uma variante específica solicitada internamente, depois
+`source` e por fim a primeira variante válida. Se uma versão exata não existir em nenhum
 repositório, `downloadUrl` deve apontar para um ZIP. O download é instalado no primeiro
 repositório e depois copiado para `packagesBase`.
+
+O `Manifest.json` de uma biblioteca pode declarar dependências transitivas no campo
+`dependencies` (o alias `packages` também é aceito), usando o mesmo formato da lista acima.
+
+```json
+{
+  "id": "wrapper",
+  "version": "1.0.0",
+  "dependencies": [
+    { "id": "core", "versionConstraint": "^2.0" }
+  ]
+}
+```
+
+Na CLI, `BuildGraph . refresh` apenas sincroniza dependências. `build`, `test` e `install` fazem
+esse refresh automaticamente quando há packages declarados. No modo interativo há um refresh na
+inicialização, o comando `refresh` pode ser executado manualmente e mudanças observadas no manifest
+também iniciam nova resolução.
 
 ### Tarefas do lifecycle
 
@@ -711,6 +804,22 @@ java -jar target/BuildGraph.jar --help
 ```
 
 O artefato `target/BuildGraph.jar` é um uber JAR executável com todas as dependências.
+
+O pacote Java raiz é `dtm.builder`; integrações que iniciam a classe principal diretamente devem
+usar `dtm.builder.Main`.
+
+## Versionamento e releases
+
+O build Maven local usa `1.0.0-SNAPSHOT` por padrão. O workflow de publicação aceita somente tags
+SemVer e usa a própria tag como versão do Maven, do `jpackage`, dos arquivos e da GitHub Release:
+
+```shell
+git tag v1.2.3
+git push origin v1.2.3
+```
+
+Tags de prerelease, como `v1.2.3-rc.1`, também são aceitas. Pushes comuns em branches não publicam
+releases. Alterações relevantes devem ser registradas no [CHANGELOG.md](CHANGELOG.md).
 
 ## Licença
 
