@@ -81,6 +81,15 @@ class UserArgsTest {
     }
 
     @Test
+    void lockCommandDoesNotInferBuild() {
+        UserArgs args = new UserArgs(new String[]{"lock"});
+
+        assertTrue(args.hasLock());
+        assertFalse(args.hasBuild());
+        assertFalse(args.isInvalidCommand());
+    }
+
+    @Test
     void unknownArgumentIsInvalid() {
         UserArgs a = new UserArgs(new String[]{"/p", "--bogus"});
         assertTrue(a.isInvalidCommand());

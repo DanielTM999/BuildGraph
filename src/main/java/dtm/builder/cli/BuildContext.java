@@ -104,6 +104,20 @@ public final class BuildContext {
         return doRefresh(configuration);
     }
 
+    public SyncResult lock() {
+        Configuration configuration = configuration(readManifest());
+        printer.println(Severity.INFO, "Atualizando lock de dependencias...");
+        SyncResult result = configuration.resolver().lockPackages(profileOverride,
+                msg -> printer.println(Severity.INFO, "{}", msg));
+        Severity severity = result.isFailure() ? Severity.ERROR : Severity.INFO;
+        printer.println(severity, "Lock: {}", result.name());
+        return result;
+    }
+
+    public SyncResult syncPackagesForBuild() {
+        return doBuildSync(configuration(readManifest()));
+    }
+
     public String compilationDatabaseJson() {
         ManifestParseResult parse = readManifest();
         if (!parse.isOk()) {
@@ -126,7 +140,7 @@ public final class BuildContext {
             }
         }
         if (effective.isPackagesDeclared()) {
-            SyncResult sync = configuration.resolver().syncPackages(profileOverride,
+            SyncResult sync = configuration.resolver().syncPackagesForBuild(profileOverride,
                     configuration.packagesDir(), null);
             if (sync.isFailure()) {
                 throw new IllegalStateException("Falha ao resolver dependencias: " + sync.name());
@@ -147,6 +161,16 @@ public final class BuildContext {
                 msg -> printer.println(Severity.INFO, "{}", msg));
         Severity sev = result.isFailure() ? Severity.ERROR : Severity.INFO;
         printer.println(sev, "Refresh: {}", result.name());
+        return result;
+    }
+
+    private SyncResult doBuildSync(Configuration configuration) {
+        printer.println(Severity.INFO, "Sincronizando dependencias para o build...");
+        SyncResult result = configuration.resolver().syncPackagesForBuild(profileOverride,
+                configuration.packagesDir(),
+                msg -> printer.println(Severity.INFO, "{}", msg));
+        Severity severity = result.isFailure() ? Severity.ERROR : Severity.INFO;
+        printer.println(severity, "Dependencias: {}", result.name());
         return result;
     }
 
@@ -180,7 +204,7 @@ public final class BuildContext {
 
         if (needsBuild(phases)
                 && (effective.isPackagesDeclared() || Files.isDirectory(packagesDir))) {
-            SyncResult sync = doRefresh(configuration);
+            SyncResult sync = doBuildSync(configuration);
             if (sync.isFailure()) {
                 printer.println(Severity.ERROR, "Falha ao resolver dependencias; abortando");
                 return false;

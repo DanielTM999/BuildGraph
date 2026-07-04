@@ -236,6 +236,7 @@ public final class BuildExecutor {
                 List<Path> linkInputs = new ArrayList<>(objects);
                 linkInputs.addAll(extraSources);
                 List<Path> trackedLinkInputs = new ArrayList<>(linkInputs);
+                trackedLinkInputs.addAll(pkgPaths.linkInputFiles());
                 for (Path dependencyArtifact : dependencyArtifacts) {
                     if (!trackedLinkInputs.contains(dependencyArtifact)) {
                         trackedLinkInputs.add(dependencyArtifact);

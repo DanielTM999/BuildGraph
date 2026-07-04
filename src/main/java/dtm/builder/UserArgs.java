@@ -27,10 +27,11 @@ public final class UserArgs {
     public static final String INSTALL = "install";
     public static final String TEST = "test";
     public static final String REFRESH = "refresh";
+    public static final String LOCK = "lock";
     public static final String INTERACTIVE = "interactive";
     public static final String NO_INCREMENTAL = "no_incremental";
 
-    private static final Set<String> RESERVED = Set.of(CLEAN, BUILD, INSTALL, TEST, REFRESH);
+    private static final Set<String> RESERVED = Set.of(CLEAN, BUILD, INSTALL, TEST, REFRESH, LOCK);
 
     private final Map<String, String> argsMap = new ConcurrentHashMap<>();
 
@@ -126,6 +127,10 @@ public final class UserArgs {
         return flag(REFRESH);
     }
 
+    public boolean hasLock() {
+        return flag(LOCK);
+    }
+
     public boolean isInteractive() {
         return flag(INTERACTIVE);
     }
@@ -187,6 +192,7 @@ public final class UserArgs {
         argsMap.put(INSTALL, "false");
         argsMap.put(TEST, "false");
         argsMap.put(REFRESH, "false");
+        argsMap.put(LOCK, "false");
         argsMap.put(INTERACTIVE, "false");
         argsMap.put(COMPILE_COMMANDS, "false");
 
@@ -216,7 +222,7 @@ public final class UserArgs {
             String arg = args[i];
 
             switch (arg) {
-                case CLEAN, BUILD, INSTALL, TEST, REFRESH -> argsMap.put(arg, "true");
+                case CLEAN, BUILD, INSTALL, TEST, REFRESH, LOCK -> argsMap.put(arg, "true");
                 case "--interactive", "-i" -> argsMap.put(INTERACTIVE, "true");
                 case "--no-incremental" -> argsMap.put(NO_INCREMENTAL, "true");
                 case "--compile-commands", "--clangd", "--compdb" ->
@@ -246,7 +252,7 @@ public final class UserArgs {
         }
 
         if (!hasClean() && !hasBuild() && !hasInstall() && !hasTest()
-                && !hasRefresh() && !isInteractive() && !hasCompileCommands()) {
+                && !hasRefresh() && !hasLock() && !isInteractive() && !hasCompileCommands()) {
             argsMap.put(BUILD, "true");
         }
     }

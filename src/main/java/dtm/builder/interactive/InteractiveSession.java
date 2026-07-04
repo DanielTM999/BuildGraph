@@ -36,7 +36,7 @@ public final class InteractiveSession {
         }
 
         context.printDiagnostics();
-        context.refresh();
+        context.syncPackagesForBuild();
 
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(System.in, StandardCharsets.UTF_8))) {
@@ -65,6 +65,10 @@ public final class InteractiveSession {
             }
             case "refresh" -> {
                 context.refresh();
+                return true;
+            }
+            case "lock" -> {
+                context.lock();
                 return true;
             }
             case "reload" -> {
@@ -116,7 +120,7 @@ public final class InteractiveSession {
     private void onManifestChanged() {
         printer.println(Severity.INFO, "Manifest alterado; reprocessando...");
         context.printDiagnostics();
-        context.refresh();
+        context.syncPackagesForBuild();
     }
 
     private void printCompilationDatabase() {
@@ -133,7 +137,7 @@ public final class InteractiveSession {
                 "Modo interativo. Fases (combinaveis, ordenadas pelo lifecycle): clean, build, "
                         + "test, install. Ex: 'install build clean' roda clean -> build -> install.");
         printer.println(Severity.INFO,
-                "Outros comandos: refresh, reload, status, compile-commands, help, quit");
+                "Outros comandos: lock, refresh, reload, status, compile-commands, help, quit");
         printer.println(Severity.INFO,
                 "Build direto e incremental por padrao; --no-incremental deve ser informado "
                         + "ao iniciar a sessao.");

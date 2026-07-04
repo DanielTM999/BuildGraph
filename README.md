@@ -43,7 +43,7 @@ java -jar BuildGraph.jar --help
 ## Uso
 
 ```text
-buildgraph [projectPath] [clean] [build] [test] [install] [refresh]
+buildgraph [projectPath] [clean] [build] [test] [install] [refresh] [lock]
            [--interactive] [-f raw|json|xml]
            [-p profile] [-c compiler]
            [--test-main arquivo]
@@ -62,6 +62,7 @@ BuildGraph executa `build`.
 | `test` | Executa build e testes. |
 | `install` | Executa build e publica o projeto no primeiro repositório configurado. |
 | `refresh` | Resolve e materializa os packages do manifest. |
+| `lock` | Resolve versões e grava `BuildGraph.lock.json` sem materializar packages. |
 | `--interactive` | Monitora o manifest e aceita comandos pela entrada padrão. |
 | `-p`, `--profile` | Profile usado somente quando o manifest não define `activeProfile`. |
 | `-c`, `--compiler` | Compilador usado somente quando o manifest não define compiladores. |
@@ -90,6 +91,9 @@ BuildGraph . test --profile debug
 
 # Usa um repositório adicional
 BuildGraph . refresh --repo D:/buildgraph-repository
+
+# Atualiza explicitamente apenas o lock de dependências
+BuildGraph . lock
 
 # Força recompilação completa sem apagar outros arquivos do outputDir
 BuildGraph . build --no-incremental
@@ -163,6 +167,7 @@ Ao iniciar, o modo interativo:
 | `test` | Executa build e depois os testes. |
 | `install` | Executa build e publica o projeto no primeiro repositório. |
 | `refresh` | Resolve novamente os packages e atualiza a pasta materializada. |
+| `lock` | Atualiza `BuildGraph.lock.json` sem materializar packages. |
 | `reload` | Relê o manifest e imprime seus diagnósticos, sem executar build. |
 | `status` | Mostra projeto, build system detectado e toolchain selecionada. |
 | `compile-commands`, `clangd` ou `compdb` | Emite a compilation database resolvida como JSON bruto. |
@@ -176,6 +181,7 @@ Exemplo de ciclo incremental dentro da sessão:
 > build
 > clean build
 > refresh
+> lock
 > quit
 ```
 
@@ -587,10 +593,32 @@ O `Manifest.json` de uma biblioteca pode declarar dependências transitivas no c
 }
 ```
 
-Na CLI, `BuildGraph . refresh` apenas sincroniza dependências. `build`, `test` e `install` fazem
-esse refresh automaticamente quando há packages declarados. No modo interativo há um refresh na
-inicialização, o comando `refresh` pode ser executado manualmente e mudanças observadas no manifest
-também iniciam nova resolução.
+Na CLI, `BuildGraph . refresh` resolve, atualiza o lock e materializa dependências. `build`, `test`
+e `install` apenas sincronizam packages usando o lock válido ou a resolução temporária do manifest.
+
+### Lock de dependências
+
+`BuildGraph.lock.json` registra as versões exatas, variantes e relações transitivas resolvidas. O
+arquivo é sempre JSON, mesmo quando o projeto usa `Manifest.xml`, e deve ser versionado junto com o
+projeto.
+
+```shell
+# Resolve e grava o lock, sem alterar a pasta local de packages
+BuildGraph . lock
+
+# Resolve, atualiza o lock e materializa packages
+BuildGraph . refresh
+```
+
+`build`, `test` e `install` usam o lock quando ele existe e corresponde às declarações do manifest.
+Se estiver ausente ou desatualizado, o BuildGraph emite um aviso, resolve diretamente do manifest e
+continua sem modificar o lock; esse build funciona, mas não tem garantia de resolução reproduzível.
+Um lock com JSON inválido é tratado como erro e precisa ser removido ou regenerado com `lock` ou
+`refresh`.
+
+No modo interativo, `lock` apenas atualiza o arquivo e `refresh` também materializa packages. A
+inicialização da sessão e alterações observadas no manifest apenas sincronizam packages usando o
+lock ou o fallback ao manifest, sem reescrever o arquivo automaticamente.
 
 ### Tarefas do lifecycle
 
@@ -827,6 +855,17 @@ java -jar target/BuildGraph.jar --help
 
 O artefato `target/BuildGraph.jar` é um uber JAR executável com todas as dependências.
 
+Testes reais de toolchain são opt-in e exigem que o compilador esteja disponível no ambiente:
+
+```shell
+mvn verify -Pnative-it-gcc
+mvn verify -Pnative-it-clang
+mvn verify -Pnative-it-msvc
+```
+
+Para MSVC, execute o comando em um Developer Command Prompt ou carregue o ambiente do Visual
+Studio antes do Maven. Ausência da toolchain faz o profile falhar explicitamente.
+
 O pacote Java raiz é `dtm.builder`; integrações que iniciam a classe principal diretamente devem
 usar `dtm.builder.Main`.
 
@@ -846,3 +885,5 @@ releases. Alterações relevantes devem ser registradas no [CHANGELOG.md](CHANGE
 ## Licença
 
 BuildGraph é software de código aberto distribuído sob a [licença MIT](LICENSE).
+Consulte também [SECURITY.md](SECURITY.md), [SUPPORT.md](SUPPORT.md) e
+[CHANGELOG.md](CHANGELOG.md).

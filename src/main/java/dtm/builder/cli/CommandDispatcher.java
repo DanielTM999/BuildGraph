@@ -68,14 +68,24 @@ public final class CommandDispatcher {
 
         Set<Phase> phases = collectPhases(args);
 
+        if (args.hasLock()) {
+            SyncResult result = context.lock();
+            if (result.isFailure()) {
+                return 1;
+            }
+        }
+
         if (args.hasRefresh()) {
             SyncResult result = context.refresh();
-            if (phases.isEmpty()) {
-                return result.isFailure() ? 1 : 0;
+            if (result.isFailure()) {
+                return 1;
             }
         }
 
         if (phases.isEmpty()) {
+            if (args.hasLock() || args.hasRefresh()) {
+                return 0;
+            }
             phases = EnumSet.of(Phase.BUILD);
         }
 
@@ -118,7 +128,7 @@ public final class CommandDispatcher {
         printer.println(Severity.NONE, "BuildGraph - mini build system para C/C++");
         printer.println(Severity.NONE, "");
         printer.println(Severity.NONE,
-                "Uso: buildgraph [projectPath] [clean] [build] [install] [test] [refresh]");
+                "Uso: buildgraph [projectPath] [clean] [build] [install] [test] [refresh] [lock]");
         printer.println(Severity.NONE,
                 "                [--interactive] [-f <fmt>] [-p <profile>] [-c <compiler>]");
         printer.println(Severity.NONE,
@@ -131,7 +141,9 @@ public final class CommandDispatcher {
         printer.println(Severity.NONE, "  projectPath   diretorio do projeto (default: diretorio atual)");
         printer.println(Severity.NONE, "  clean/build/install/test  fases do lifecycle (default: build)");
         printer.println(Severity.NONE,
-                "  refresh       resolve constraints/transitivas e materializa dependencias");
+                "  refresh       resolve, atualiza lock e materializa dependencias");
+        printer.println(Severity.NONE,
+                "  lock          resolve e grava BuildGraph.lock.json sem materializar");
         printer.println(Severity.NONE, "  --interactive monitora o Manifest e aceita comandos via stdin");
         printer.println(Severity.NONE, "  -f, --format  raw | json | xml");
         printer.println(Severity.NONE, "  -p, --profile profile ativo (fallback do manifest)");

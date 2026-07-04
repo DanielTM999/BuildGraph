@@ -16,6 +16,7 @@ public final class PackagePaths {
     private final List<Path> includeDirs = new ArrayList<>();
     private final List<Path> libraryDirs = new ArrayList<>();
     private final List<String> linkLibraries = new ArrayList<>();
+    private final List<Path> linkInputFiles = new ArrayList<>();
 
     public List<Path> includeDirs() {
         return includeDirs;
@@ -27,6 +28,11 @@ public final class PackagePaths {
 
     public List<String> linkLibraries() {
         return linkLibraries;
+    }
+
+    /** Arquivos de packages que podem ser selecionados pelo linker. */
+    public List<Path> linkInputFiles() {
+        return linkInputFiles;
     }
 
     public static PackagePaths resolve(Path packagesDir) {
@@ -51,7 +57,9 @@ public final class PackagePaths {
                         addIfDir(out.includeDirs, pkgDir.resolve(inc).normalize());
                     }
                     for (String lib : lm.getLibraryPaths()) {
-                        addIfDir(out.libraryDirs, pkgDir.resolve(lib).normalize());
+                        Path libraryDir = pkgDir.resolve(lib).normalize();
+                        addIfDir(out.libraryDirs, libraryDir);
+                        collectLinkInputs(out.linkInputFiles, libraryDir);
                     }
                     out.linkLibraries.addAll(lm.getLinkLibraries());
                 } catch (IOException ignored) {
@@ -68,5 +76,31 @@ public final class PackagePaths {
         if (Files.isDirectory(dir) && !list.contains(dir)) {
             list.add(dir);
         }
+    }
+
+    private static void collectLinkInputs(List<Path> inputs, Path directory) {
+        if (!Files.isDirectory(directory)) {
+            return;
+        }
+        try (Stream<Path> files = Files.list(directory)) {
+            files.filter(Files::isRegularFile)
+                    .filter(PackagePaths::isLinkInput)
+                    .map(path -> path.toAbsolutePath().normalize())
+                    .sorted()
+                    .forEach(path -> {
+                        if (!inputs.contains(path)) {
+                            inputs.add(path);
+                        }
+                    });
+        } catch (IOException ignored) {
+
+        }
+    }
+
+    private static boolean isLinkInput(Path path) {
+        String name = path.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+        return name.endsWith(".a") || name.endsWith(".lib") || name.endsWith(".dll")
+                || name.endsWith(".dylib") || name.endsWith(".so")
+                || name.contains(".so.");
     }
 }

@@ -25,6 +25,9 @@
         <jackson.version>2.18.2</jackson.version>
         <junit.version>5.11.3</junit.version>
         <main.class>dtm.builder.Main</main.class>
+        <skipNativeITs>true</skipNativeITs>
+        <native.c.compiler></native.c.compiler>
+        <native.cxx.compiler></native.cxx.compiler>
     </properties>
 
     <dependencies>
@@ -60,6 +63,30 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.2</version>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>3.5.2</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <skipITs>${skipNativeITs}</skipITs>
+                    <includes>
+                        <include>**/*NativeIT.java</include>
+                    </includes>
+                    <systemPropertyVariables>
+                        <buildgraph.it.cCompiler>${native.c.compiler}</buildgraph.it.cCompiler>
+                        <buildgraph.it.cxxCompiler>${native.cxx.compiler}</buildgraph.it.cxxCompiler>
+                    </systemPropertyVariables>
+                </configuration>
             </plugin>
 
             <plugin>
@@ -101,5 +128,32 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>native-it-gcc</id>
+            <properties>
+                <skipNativeITs>false</skipNativeITs>
+                <native.c.compiler>gcc</native.c.compiler>
+                <native.cxx.compiler>g++</native.cxx.compiler>
+            </properties>
+        </profile>
+        <profile>
+            <id>native-it-clang</id>
+            <properties>
+                <skipNativeITs>false</skipNativeITs>
+                <native.c.compiler>clang</native.c.compiler>
+                <native.cxx.compiler>clang++</native.cxx.compiler>
+            </properties>
+        </profile>
+        <profile>
+            <id>native-it-msvc</id>
+            <properties>
+                <skipNativeITs>false</skipNativeITs>
+                <native.c.compiler>cl</native.c.compiler>
+                <native.cxx.compiler>cl</native.cxx.compiler>
+            </properties>
+        </profile>
+    </profiles>
 
 </project>
