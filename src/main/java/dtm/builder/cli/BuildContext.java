@@ -3,6 +3,7 @@ package dtm.builder.cli;
 import dtm.builder.build.BuildDiagnosticParser;
 import dtm.builder.build.BuildSystem;
 import dtm.builder.build.BuildSystemDetector;
+import dtm.builder.build.SourceCollector;
 import dtm.builder.build.Toolchain;
 import dtm.builder.build.ToolchainDetector;
 import dtm.builder.integration.CompilationDatabaseGenerator;
@@ -197,11 +198,14 @@ public final class BuildContext {
                 ? activeProfile.getBuildType() : "Debug";
 
         BuildSystem buildSystem = BuildSystemDetector.detect(projectPath, hasManifest);
-        if (!hasManifest && buildSystem == BuildSystem.DEFAULT) {
-            printer.println(Severity.WARNING,
+        if (!hasManifest && buildSystem == BuildSystem.DEFAULT
+                && SourceCollector.collectSources(projectPath, effective).isEmpty()) {
+            LifecycleResult result = LifecycleResult.fail(
                     "Nenhum Manifest.json/Manifest.xml, CMakeLists.txt, meson.build ou Makefile "
-                            + "encontrado em {}; tentando build direto com descoberta automatica de fontes C/C++",
-                    projectPath);
+                            + "encontrado em " + projectPath
+                            + ", e nenhuma fonte C/C++ foi localizada para build direto");
+            printBuildSummary(result, (System.nanoTime() - startNanos) / 1_000_000L);
+            return false;
         }
         Toolchain toolchain = ToolchainDetector.resolve(effective, compilerOverride);
         Path packagesDir = configuration.packagesDir();
