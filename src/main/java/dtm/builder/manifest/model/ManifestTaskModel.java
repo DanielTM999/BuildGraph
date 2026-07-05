@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
+import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -25,11 +26,13 @@ public class ManifestTaskModel {
     private boolean failOnError = true;
 
     @JsonSetter(nulls = Nulls.SKIP)
-    @JacksonXmlElementWrapper(useWrapping = false)
+    @JacksonXmlElementWrapper(localName = "args")
+    @JacksonXmlProperty(localName = "arg")
     private List<String> args = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
-    @JacksonXmlElementWrapper(useWrapping = false)
+    @JacksonXmlElementWrapper(localName = "dependsOn")
+    @JacksonXmlProperty(localName = "dependency")
     private List<String> dependsOn = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)

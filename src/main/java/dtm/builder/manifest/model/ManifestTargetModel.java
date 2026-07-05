@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
+import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,43 +21,53 @@ public class ManifestTargetModel {
     private String type;
 
     @JsonSetter(nulls = Nulls.SKIP)
-    @JacksonXmlElementWrapper(useWrapping = false)
+    @JacksonXmlElementWrapper(localName = "sources")
+    @JacksonXmlProperty(localName = "source")
     private List<String> sources = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
-    @JacksonXmlElementWrapper(useWrapping = false)
+    @JacksonXmlElementWrapper(localName = "excludeSources")
+    @JacksonXmlProperty(localName = "excludeSource")
     private List<String> excludeSources = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
-    @JacksonXmlElementWrapper(useWrapping = false)
+    @JacksonXmlElementWrapper(localName = "includes")
+    @JacksonXmlProperty(localName = "include")
     private List<String> includes = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
-    @JacksonXmlElementWrapper(useWrapping = false)
+    @JacksonXmlElementWrapper(localName = "excludeIncludes")
+    @JacksonXmlProperty(localName = "excludeInclude")
     private List<String> excludeIncludes = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
-    @JacksonXmlElementWrapper(useWrapping = false)
+    @JacksonXmlElementWrapper(localName = "defines")
+    @JacksonXmlProperty(localName = "define")
     private List<String> defines = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
-    @JacksonXmlElementWrapper(useWrapping = false)
+    @JacksonXmlElementWrapper(localName = "excludeDefines")
+    @JacksonXmlProperty(localName = "excludeDefine")
     private List<String> excludeDefines = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
-    @JacksonXmlElementWrapper(useWrapping = false)
+    @JacksonXmlElementWrapper(localName = "compileFlags")
+    @JacksonXmlProperty(localName = "compileFlag")
     private List<String> compileFlags = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
-    @JacksonXmlElementWrapper(useWrapping = false)
+    @JacksonXmlElementWrapper(localName = "linkFlags")
+    @JacksonXmlProperty(localName = "linkFlag")
     private List<String> linkFlags = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
-    @JacksonXmlElementWrapper(useWrapping = false)
+    @JacksonXmlElementWrapper(localName = "libraryPaths")
+    @JacksonXmlProperty(localName = "libraryPath")
     private List<String> libraryPaths = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
-    @JacksonXmlElementWrapper(useWrapping = false)
+    @JacksonXmlElementWrapper(localName = "dependsOn")
+    @JacksonXmlProperty(localName = "dependency")
     private List<String> dependsOn = new ArrayList<>();
 
     public String getId() {

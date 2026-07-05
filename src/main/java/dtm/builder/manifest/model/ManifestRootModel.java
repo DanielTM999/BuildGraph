@@ -38,31 +38,38 @@ public class ManifestRootModel {
     private String testMain;
 
     @JsonSetter(nulls = Nulls.SKIP)
-    @JacksonXmlElementWrapper(useWrapping = false)
+    @JacksonXmlElementWrapper(localName = "repositories")
+    @JacksonXmlProperty(localName = "repository")
     private List<String> repositories = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
-    @JacksonXmlElementWrapper(useWrapping = false)
+    @JacksonXmlElementWrapper(localName = "sources")
+    @JacksonXmlProperty(localName = "source")
     private List<String> sources = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
-    @JacksonXmlElementWrapper(useWrapping = false)
+    @JacksonXmlElementWrapper(localName = "includes")
+    @JacksonXmlProperty(localName = "include")
     private List<String> includes = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
-    @JacksonXmlElementWrapper(useWrapping = false)
+    @JacksonXmlElementWrapper(localName = "defines")
+    @JacksonXmlProperty(localName = "define")
     private List<String> defines = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
-    @JacksonXmlElementWrapper(useWrapping = false)
+    @JacksonXmlElementWrapper(localName = "compileFlags")
+    @JacksonXmlProperty(localName = "compileFlag")
     private List<String> compileFlags = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
-    @JacksonXmlElementWrapper(useWrapping = false)
+    @JacksonXmlElementWrapper(localName = "linkFlags")
+    @JacksonXmlProperty(localName = "linkFlag")
     private List<String> linkFlags = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
-    @JacksonXmlElementWrapper(useWrapping = false)
+    @JacksonXmlElementWrapper(localName = "libraryPaths")
+    @JacksonXmlProperty(localName = "libraryPath")
     private List<String> libraryPaths = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
@@ -75,7 +82,8 @@ public class ManifestRootModel {
     private Map<String, ManifestProfileModel> profiles = new LinkedHashMap<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
-    @JacksonXmlElementWrapper(useWrapping = false)
+    @JacksonXmlElementWrapper(localName = "packages")
+    @JacksonXmlProperty(localName = "package")
     private List<ManifestPackagesModel> packages = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
@@ -84,7 +92,8 @@ public class ManifestRootModel {
     private List<ManifestTaskModel> tasks = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
-    @JacksonXmlElementWrapper(useWrapping = false)
+    @JacksonXmlElementWrapper(localName = "targets")
+    @JacksonXmlProperty(localName = "target")
     private List<ManifestTargetModel> targets = new ArrayList<>();
 
     @JsonIgnore

@@ -63,14 +63,22 @@ class ManifestTargetsParsingTest {
                   <id>vema</id>
                   <version>0.1.0</version>
                   <targets>
-                    <id>vema-core</id>
-                    <type>shared</type>
-                    <sources>src/core</sources>
-                  </targets>
-                  <targets>
-                    <id>vema</id>
-                    <sources>src/runtime</sources>
-                    <dependsOn>vema-core</dependsOn>
+                    <target>
+                      <id>vema-core</id>
+                      <type>shared</type>
+                      <sources>
+                        <source>src/core</source>
+                      </sources>
+                    </target>
+                    <target>
+                      <id>vema</id>
+                      <sources>
+                        <source>src/runtime</source>
+                      </sources>
+                      <dependsOn>
+                        <dependency>vema-core</dependency>
+                      </dependsOn>
+                    </target>
                   </targets>
                 </Manifest>
                 """;

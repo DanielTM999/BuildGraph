@@ -16,8 +16,10 @@ class ManifestParserTest {
                 "{\"repositories\":[\"repo/a\",\"D:/repo-b\"]}", false).getManifest();
         ManifestRootModel xml = ManifestParser.readManifest("""
                 <Manifest>
-                  <repositories>repo/a</repositories>
-                  <repositories>D:/repo-b</repositories>
+                  <repositories>
+                    <repository>repo/a</repository>
+                    <repository>D:/repo-b</repository>
+                  </repositories>
                 </Manifest>
                 """, true).getManifest();
 
@@ -69,11 +71,15 @@ class ManifestParserTest {
                   <id>MyProjectTeste</id>
                   <name>MyProjectTeste</name>
                   <version>2.0.0</version>
-                  <sources>src</sources>
-                  <sources>lib</sources>
+                  <sources>
+                    <source>src</source>
+                    <source>lib</source>
+                  </sources>
                   <packages>
-                    <id>fmt</id>
-                    <version>10.2.1</version>
+                    <package>
+                      <id>fmt</id>
+                      <version>10.2.1</version>
+                    </package>
                   </packages>
                   <tasks>
                     <task>
@@ -81,15 +87,21 @@ class ManifestParserTest {
                       <phase>build</phase>
                       <when>after</when>
                       <command>echo</command>
-                      <args>prepare</args>
+                      <args>
+                        <arg>prepare</arg>
+                      </args>
                     </task>
                     <task>
                       <id>publish</id>
                       <phase>build</phase>
                       <when>after</when>
-                      <dependsOn>prepare</dependsOn>
+                      <dependsOn>
+                        <dependency>prepare</dependency>
+                      </dependsOn>
                       <command>echo</command>
-                      <args>publish</args>
+                      <args>
+                        <arg>publish</arg>
+                      </args>
                     </task>
                   </tasks>
                 </Manifest>
