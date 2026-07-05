@@ -17,11 +17,11 @@ class ManifestTargetsParsingTest {
             {
               "id": "vema",
               "version": "0.1.0",
-              "sourceFolders": ["src/shared"],
+              "sources": ["src/shared"],
               "targets": [
-                { "id": "vema-core", "type": "shared", "sourceFolders": ["src/core"] },
-                { "id": "vema-jit", "type": "static", "sourceFolders": ["src/jit"], "dependsOn": ["vema-core"] },
-                { "id": "vema", "sourceFolders": ["src/runtime"], "dependsOn": ["vema-core", "vema-jit"] }
+                { "id": "vema-core", "type": "shared", "sources": ["src/core"] },
+                { "id": "vema-jit", "type": "static", "sources": ["src/jit"], "dependsOn": ["vema-core"] },
+                { "id": "vema", "sources": ["src/runtime"], "dependsOn": ["vema-core", "vema-jit"] }
               ],
               "profiles": {
                 "windows": {
@@ -41,7 +41,7 @@ class ManifestTargetsParsingTest {
         ManifestTargetModel core = m.getTargets().get(0);
         assertEquals("vema-core", core.getId());
         assertEquals("shared", core.getType());
-        assertEquals(List.of("src/core"), core.getSourceFolders());
+        assertEquals(List.of("src/core"), core.getSources());
 
         ManifestTargetModel jit = m.getTargets().get(1);
         assertEquals("static", jit.getType());
@@ -65,11 +65,11 @@ class ManifestTargetsParsingTest {
                   <targets>
                     <id>vema-core</id>
                     <type>shared</type>
-                    <sourceFolders>src/core</sourceFolders>
+                    <sources>src/core</sources>
                   </targets>
                   <targets>
                     <id>vema</id>
-                    <sourceFolders>src/runtime</sourceFolders>
+                    <sources>src/runtime</sources>
                     <dependsOn>vema-core</dependsOn>
                   </targets>
                 </Manifest>

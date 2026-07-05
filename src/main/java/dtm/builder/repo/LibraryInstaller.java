@@ -73,13 +73,13 @@ public final class LibraryInstaller {
         if (isBlank(manifest.getKind())) {
             manifest.setKind(LibraryManifest.KIND_SOURCE);
         }
-        if (manifest.getIncludePaths().isEmpty()) {
-            manifest.getIncludePaths().add(Files.isDirectory(packageRoot.resolve("include"))
+        if (manifest.getIncludes().isEmpty()) {
+            manifest.getIncludes().add(Files.isDirectory(packageRoot.resolve("include"))
                     ? "include" : ".");
         }
-        if (manifest.getSourceFolders().isEmpty()
+        if (manifest.getSources().isEmpty()
                 && Files.isDirectory(packageRoot.resolve("src"))) {
-            manifest.getSourceFolders().add("src");
+            manifest.getSources().add("src");
         }
         manifest.setSource("Manifest");
         return manifest;

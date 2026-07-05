@@ -134,7 +134,7 @@ public final class BuildExecutor {
         boolean msvc = req.toolchain().isMsvc();
 
         List<Path> sources = SourceCollector.collectSources(projectPath,
-                target.sourceFolders(), target.synthetic());
+                target.sources(), target.synthetic());
         if (sources.isEmpty()) {
             return BuildResult.fail(1, "Nenhum arquivo de fonte C/C++ encontrado");
         }
@@ -150,8 +150,8 @@ public final class BuildExecutor {
         List<Path> dependencyArtifacts = new ArrayList<>();
 
         for (ResolvedTarget dep : transitiveDependencies(graph, target)) {
-            targetManifest.setIncludePaths(ManifestMerge.mergeAdditive(
-                    targetManifest.getIncludePaths(), dep.includePaths(), null));
+            targetManifest.setIncludes(ManifestMerge.mergeAdditive(
+                    targetManifest.getIncludes(), dep.includes(), null));
             Path depArtifact = Artifacts.artifactPath(req.buildDir(), dep.name(), dep.type(), msvc);
             dependencyArtifacts.add(depArtifact);
             if (dep.type() == TargetType.SHARED) {
@@ -288,7 +288,7 @@ public final class BuildExecutor {
     static int actionCount(Path projectPath, TargetGraph graph) {
         int total = 0;
         for (ResolvedTarget target : graph.targets()) {
-            total += SourceCollector.collectSources(projectPath, target.sourceFolders(),
+            total += SourceCollector.collectSources(projectPath, target.sources(),
                     target.synthetic()).size() + 1;
         }
         return Math.max(1, total);

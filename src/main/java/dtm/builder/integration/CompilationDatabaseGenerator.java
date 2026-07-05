@@ -37,7 +37,7 @@ public final class CompilationDatabaseGenerator {
         Map<Path, ResolvedTarget> sourcesByTarget = new LinkedHashMap<>();
         for (ResolvedTarget target : resolution.targets()) {
             for (Path source : SourceCollector.collectSources(projectPath,
-                    target.sourceFolders(), target.synthetic())) {
+                    target.sources(), target.synthetic())) {
                 sourcesByTarget.putIfAbsent(source.toAbsolutePath().normalize(), target);
             }
         }

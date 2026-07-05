@@ -30,8 +30,8 @@ class CompilationDatabaseGeneratorTest {
         Files.writeString(src.resolve("feature.cpp"), "int feature() { return 1; }");
 
         ManifestRootModel manifest = new ManifestRootModel();
-        manifest.setSourceFolders(new ArrayList<>(List.of("src")));
-        manifest.setIncludePaths(new ArrayList<>(List.of("include")));
+        manifest.setSources(new ArrayList<>(List.of("src")));
+        manifest.setIncludes(new ArrayList<>(List.of("include")));
         manifest.setDefines(new ArrayList<>(List.of("APP=1")));
         manifest.setCompileFlags(new ArrayList<>(List.of("-Wall")));
         manifest.setLinkFlags(new ArrayList<>(List.of("-Wl,should-not-appear")));
@@ -67,7 +67,7 @@ class CompilationDatabaseGeneratorTest {
     @Test
     void emptyProjectProducesEmptyDatabaseWithoutToolchain() {
         ManifestRootModel manifest = new ManifestRootModel();
-        manifest.setSourceFolders(new ArrayList<>(List.of("missing")));
+        manifest.setSources(new ArrayList<>(List.of("missing")));
 
         String json = CompilationDatabaseGenerator.generate(project, manifest, null,
                 project.resolve("packages"), project.resolve("build"), "Debug");

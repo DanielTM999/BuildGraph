@@ -50,7 +50,7 @@ class NativeToolchainNativeIT {
                   "version":"1.0.0",
                   "cCompiler":"%s",
                   "cxxCompiler":"%s",
-                  "sourceFolders":["src"]
+                  "sources":["src"]
                 }
                 """.formatted(cCompiler(), cxxCompiler()));
 
@@ -89,10 +89,10 @@ class NativeToolchainNativeIT {
                   "version":"1.0.0",
                   "cCompiler":"%s",
                   "cxxCompiler":"%s",
-                  "includePaths":["include"],
+                  "includes":["include"],
                   "targets":[
-                    {"id":"answer","type":"static","sourceFolders":["lib"]},
-                    {"id":"app","type":"executable","sourceFolders":["app"],
+                    {"id":"answer","type":"static","sources":["lib"]},
+                    {"id":"app","type":"executable","sources":["app"],
                      "dependsOn":["answer"]}
                   ]
                 }
@@ -120,7 +120,7 @@ class NativeToolchainNativeIT {
                   "cCompiler":"%s",
                   "cxxCompiler":"%s",
                   "cxxStandard":"c++17",
-                  "sourceFolders":["src"]
+                  "sources":["src"]
                 }
                 """.formatted(cCompiler(), cxxCompiler()));
 
@@ -152,11 +152,11 @@ class NativeToolchainNativeIT {
                   "version":"1.0.0",
                   "cCompiler":"%s",
                   "cxxCompiler":"%s",
-                  "includePaths":["include"],
+                  "includes":["include"],
                   "linkFlags":["%s"],
                   "targets":[
-                    {"id":"shared_answer","type":"shared","sourceFolders":["lib"]},
-                    {"id":"shared_app","type":"executable","sourceFolders":["app"],
+                    {"id":"shared_answer","type":"shared","sources":["lib"]},
+                    {"id":"shared_app","type":"executable","sources":["app"],
                      "dependsOn":["shared_answer"]}
                   ]
                 }

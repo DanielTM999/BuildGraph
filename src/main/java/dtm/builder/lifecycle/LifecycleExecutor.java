@@ -116,7 +116,7 @@ public final class LifecycleExecutor {
                     manifest.isLibrary());
             return publish(ctx, projectId,
                     notBlank(manifest.getName()) ? manifest.getName() : projectId,
-                    version, manifest.getDescription(), manifest.getIncludePaths(), artifact);
+                    version, manifest.getDescription(), manifest.getIncludes(), artifact);
         }
 
         List<String> published = new ArrayList<>();
@@ -128,7 +128,7 @@ public final class LifecycleExecutor {
             Path artifact = Artifacts.artifactPath(ctx.buildDir(), target.name(),
                     target.type(), msvc);
             LifecycleResult one = publish(ctx, packageId, target.name(), version,
-                    manifest.getDescription(), target.includePaths(), artifact);
+                    manifest.getDescription(), target.includes(), artifact);
             if (!one.success()) {
                 return one;
             }
@@ -143,7 +143,7 @@ public final class LifecycleExecutor {
 
     private static LifecycleResult publish(LifecycleContext ctx, String id, String name,
                                            String version, String description,
-                                           List<String> includePaths, Path artifact) {
+                                           List<String> includes, Path artifact) {
         Path content = null;
         try {
             content = Files.createTempDirectory("buildgraph-install-");
@@ -157,7 +157,7 @@ public final class LifecycleExecutor {
             lm.setDependencies(new ArrayList<>(ctx.manifest().getPackages()));
 
             List<String> includeNames = new ArrayList<>();
-            for (String inc : includePaths) {
+            for (String inc : includes) {
                 Path src = ctx.projectPath().resolve(inc).normalize();
                 if (!Files.exists(src)) {
                     continue;
@@ -171,7 +171,7 @@ public final class LifecycleExecutor {
                 }
                 includeNames.add(base);
             }
-            lm.setIncludePaths(includeNames);
+            lm.setIncludes(includeNames);
 
             if (Files.isRegularFile(artifact)) {
                 Path bin = content.resolve("bin");

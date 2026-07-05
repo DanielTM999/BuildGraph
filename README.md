@@ -228,7 +228,7 @@ A resolução considera:
 - Manifest raiz e profile ativo.
 - `cCompiler` e `cxxCompiler`, com `--compiler` como fallback.
 - `cStandard`, `cxxStandard`, sysroot, target, defines e flags de compilação.
-- `sourceFolders` e extensões de cada fonte.
+- `sources` e extensões de cada fonte.
 - Includes do projeto e de packages materializados.
 - `Debug`/`Release` e o `outputDir` efetivo.
 
@@ -311,8 +311,8 @@ Exemplo JSON:
   "cxxStandard": "c++20",
   "cCompiler": "gcc",
   "cxxCompiler": "g++",
-  "sourceFolders": ["src"],
-  "includePaths": ["include"],
+  "sources": ["src"],
+  "includes": ["include"],
   "defines": ["APP_VERSION=1"],
   "compileFlags": ["-Wall"],
   "linkFlags": [],
@@ -368,10 +368,10 @@ Campos desconhecidos são ignorados. Listas e mapas nulos são tratados como vaz
 | `platform` | string | Target/triple de plataforma usado quando aplicável. |
 | `toolchainVersion` | string | Metadata de versão da toolchain disponível para profiles/placeholders. |
 | `sysroot` | string | Caminho passado como `--sysroot` em compiladores compatíveis. |
-| `sourceFolders` | string[] | Pastas de fontes C/C++ relativas ao projeto. |
+| `sources` | string[] | Pastas ou arquivos de fonte C/C++ relativos ao projeto. |
 | `testFolder` | string | Pasta de fontes de teste relativa ao projeto. Ausente ou vazia usa `<projeto>/tests`. |
 | `testMain` | string | Arquivo com `main()`, relativo a `testFolder`. Ausente ou vazio procura exatamente um `main()` na pasta. |
-| `includePaths` | string[] | Pastas de headers adicionadas à linha de compilação. |
+| `includes` | string[] | Pastas de headers adicionadas à linha de compilação. |
 | `defines` | string[] | Macros; `-D` ou `/D` é acrescentado quando necessário. |
 | `compileFlags` | string[] | Argumentos extras inseridos na compilação. |
 | `linkFlags` | string[] | Argumentos extras inseridos na etapa de link GCC/Clang. |
@@ -396,8 +396,8 @@ O mesmo modelo pode ser escrito em XML. Exemplo mínimo:
   <version>1.0.0</version>
   <cCompiler>gcc</cCompiler>
   <cxxCompiler>g++</cxxCompiler>
-  <sourceFolders>src</sourceFolders>
-  <includePaths>include</includePaths>
+  <sources>src</sources>
+  <includes>include</includes>
   <repositories>../packages-repository</repositories>
 </Manifest>
 ```
@@ -422,7 +422,7 @@ Listas do profile são combinadas com as listas do manifest raiz. Por exemplo, s
 package `A` e o profile declara `B`, o resultado será `A+B`. Se ambos declararem o mesmo `id`, a
 entrada do profile substitui a entrada raiz.
 
-Também podem ser usados `excludeIncludePaths`, `excludeSourceFolders` e `excludeDefines` para
+Também podem ser usados `excludeIncludes`, `excludeSources` e `excludeDefines` para
 remover valores herdados. `env` e `properties` são combinados por chave, com o profile prevalecendo.
 
 Regras completas de composição:
@@ -430,7 +430,7 @@ Regras completas de composição:
 - Scalars como compilador, padrão, plataforma, `outputDir` e `packagesBase`: o valor não vazio do
   profile substitui o valor raiz.
 - `library`: o valor do profile substitui a raiz somente quando declarado.
-- `sourceFolders`, `includePaths`, `defines`, `libraryPaths` e `repositories`: união ordenada sem
+- `sources`, `includes`, `defines`, `libraryPaths` e `repositories`: união ordenada sem
   duplicatas.
 - `compileFlags` e `linkFlags`: concatenação raiz + profile, preservando inclusive duplicatas.
 - `packages`: união por `id`; uma entrada do profile substitui a raiz quando o `id` é igual.
@@ -451,16 +451,16 @@ mantido: um único artefato controlado por `library`.
 {
   "id": "vema",
   "version": "0.1.0",
-  "sourceFolders": ["src/shared"],
-  "includePaths": ["include"],
+  "sources": ["src/shared"],
+  "includes": ["include"],
   "targets": [
-    { "id": "vema-core", "type": "shared", "sourceFolders": ["src/core"],
+    { "id": "vema-core", "type": "shared", "sources": ["src/core"],
       "defines": ["VEMA_CORE_BUILD"] },
-    { "id": "vema-jit",  "type": "static", "sourceFolders": ["src/jit"],
+    { "id": "vema-jit",  "type": "static", "sources": ["src/jit"],
       "dependsOn": ["vema-core"] },
-    { "id": "vema",      "type": "executable", "sourceFolders": ["src/runtime"],
+    { "id": "vema",      "type": "executable", "sources": ["src/runtime"],
       "dependsOn": ["vema-core", "vema-jit"] },
-    { "id": "vemac",     "type": "executable", "sourceFolders": ["src/compiler"],
+    { "id": "vemac",     "type": "executable", "sources": ["src/compiler"],
       "dependsOn": ["vema-core"] }
   ],
   "profiles": {
@@ -478,8 +478,8 @@ Campos de cada target:
 | `id` | string | Obrigatório e único. Identifica o target no grafo, em `--target` e na pasta de intermediários. |
 | `name` | string | Nome-base do artefato; default é o `id`. |
 | `type` | string | `executable` (default), `shared` (`.dll`/`.so`/`.dylib`) ou `static` (`.a`/`.lib`). |
-| `sourceFolders` | string[] | Somadas às da raiz; `excludeSourceFolders` remove herdadas. |
-| `includePaths`, `defines` | string[] | Somados aos da raiz; `excludeIncludePaths`/`excludeDefines` removem herdados. |
+| `sources` | string[] | Somadas às da raiz; `excludeSources` remove herdadas. |
+| `includes`, `defines` | string[] | Somados aos da raiz; `excludeIncludes`/`excludeDefines` removem herdados. |
 | `compileFlags`, `linkFlags` | string[] | Concatenados aos da raiz. |
 | `libraryPaths` | string[] | Somados aos da raiz. |
 | `dependsOn` | string[] | Ids de outros targets: define a ordem de build e o link automático. |
@@ -488,13 +488,13 @@ Regras:
 
 - **Herança**: cada target herda o manifesto efetivo (raiz + profile ativo) com as mesmas regras
   incrementais dos profiles. Declare as pastas compartilhadas na raiz e as específicas em cada
-  target. Em modo multi-target não há fallback para `src`/raiz: um target sem `sourceFolders`
+  target. Em modo multi-target não há fallback para `src`/raiz: um target sem `sources`
   efetivos é erro.
 - **Profiles × targets**: `profiles.<nome>.targets` é combinado por `id` com os targets da raiz
   (listas somam, scalars sobrescrevem); um `id` novo adiciona um target. A ordem final de
   composição é raiz → profile → target → override do profile no target.
 - **Dependências**: `dependsOn` builda o dep antes e linka automaticamente — shared vira
-  `-L<outputDir> -l<name>`, static entra pelo caminho completo do `.a`/`.lib`. Os `includePaths`
+  `-L<outputDir> -l<name>`, static entra pelo caminho completo do `.a`/`.lib`. Os `includes`
   do dep são herdados (transitivamente). Dependências devem ser `shared` ou `static`; ciclos e
   ids desconhecidos são erros.
 - **Paralelismo**: targets independentes no grafo compilam em paralelo por padrão (limite =
@@ -506,7 +506,7 @@ Regras:
 - **Static**: exige um archiver — `llvm-ar` (procurado ao lado do compilador), `ar` no PATH ou
   `lib.exe` no MSVC.
 - **`install`**: publica cada target `shared`/`static` como package `<id-do-projeto>-<id-do-target>`
-  com a versão do projeto, contendo o artefato e os `includePaths` do target. Executáveis não são
+  com a versão do projeto, contendo o artefato e os `includes` do target. Executáveis não são
   publicados.
 - **`test`**: os testes compilam com as fontes compartilhadas da raiz e linkam contra os
   artefatos das bibliotecas do projeto.
@@ -804,8 +804,9 @@ Make, a configuração detalhada permanece sob controle do projeto externo.
 
 No build direto, as fontes são procuradas da seguinte maneira:
 
-1. Pastas declaradas em `sourceFolders`.
-2. A pasta `src`, quando existe e `sourceFolders` está vazio.
+1. Entradas declaradas em `sources` — cada uma pode ser uma pasta (percorrida recursivamente) ou
+   o caminho de um arquivo de fonte individual.
+2. A pasta `src`, quando existe e `sources` está vazio.
 3. A raiz do projeto como último fallback.
 
 São reconhecidos arquivos `.c`, `.cpp`, `.cc`, `.cxx`, `.c++`, módulos C++ (`.cppm`, `.ixx`,

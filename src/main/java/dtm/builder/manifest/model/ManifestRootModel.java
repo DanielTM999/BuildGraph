@@ -43,11 +43,11 @@ public class ManifestRootModel {
 
     @JsonSetter(nulls = Nulls.SKIP)
     @JacksonXmlElementWrapper(useWrapping = false)
-    private List<String> sourceFolders = new ArrayList<>();
+    private List<String> sources = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
     @JacksonXmlElementWrapper(useWrapping = false)
-    private List<String> includePaths = new ArrayList<>();
+    private List<String> includes = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
     @JacksonXmlElementWrapper(useWrapping = false)
@@ -242,20 +242,20 @@ public class ManifestRootModel {
         this.repositories = repositories != null ? repositories : new ArrayList<>();
     }
 
-    public List<String> getSourceFolders() {
-        return sourceFolders;
+    public List<String> getSources() {
+        return sources;
     }
 
-    public void setSourceFolders(List<String> sourceFolders) {
-        this.sourceFolders = sourceFolders != null ? sourceFolders : new ArrayList<>();
+    public void setSources(List<String> sources) {
+        this.sources = sources != null ? sources : new ArrayList<>();
     }
 
-    public List<String> getIncludePaths() {
-        return includePaths;
+    public List<String> getIncludes() {
+        return includes;
     }
 
-    public void setIncludePaths(List<String> includePaths) {
-        this.includePaths = includePaths != null ? includePaths : new ArrayList<>();
+    public void setIncludes(List<String> includes) {
+        this.includes = includes != null ? includes : new ArrayList<>();
     }
 
     public List<String> getDefines() {

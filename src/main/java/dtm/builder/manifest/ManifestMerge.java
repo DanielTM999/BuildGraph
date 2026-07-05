@@ -142,14 +142,14 @@ public final class ManifestMerge {
         out.setId(pick(base.getId(), override.getId()));
         out.setName(pick(base.getName(), override.getName()));
         out.setType(pick(base.getType(), override.getType()));
-        out.setSourceFolders(mergeAdditive(base.getSourceFolders(), override.getSourceFolders(),
-                override.getExcludeSourceFolders()));
-        out.setExcludeSourceFolders(mergeAdditive(base.getExcludeSourceFolders(),
-                override.getExcludeSourceFolders(), null));
-        out.setIncludePaths(mergeAdditive(base.getIncludePaths(), override.getIncludePaths(),
-                override.getExcludeIncludePaths()));
-        out.setExcludeIncludePaths(mergeAdditive(base.getExcludeIncludePaths(),
-                override.getExcludeIncludePaths(), null));
+        out.setSources(mergeAdditive(base.getSources(), override.getSources(),
+                override.getExcludeSources()));
+        out.setExcludeSources(mergeAdditive(base.getExcludeSources(),
+                override.getExcludeSources(), null));
+        out.setIncludes(mergeAdditive(base.getIncludes(), override.getIncludes(),
+                override.getExcludeIncludes()));
+        out.setExcludeIncludes(mergeAdditive(base.getExcludeIncludes(),
+                override.getExcludeIncludes(), null));
         out.setDefines(mergeAdditive(base.getDefines(), override.getDefines(),
                 override.getExcludeDefines()));
         out.setExcludeDefines(mergeAdditive(base.getExcludeDefines(),

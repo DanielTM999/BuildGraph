@@ -28,7 +28,7 @@ public final class SourceCollector {
     }
 
     public static List<Path> collectSources(Path projectPath, ManifestRootModel manifest) {
-        List<String> declared = manifest == null ? List.of() : manifest.getSourceFolders();
+        List<String> declared = manifest == null ? List.of() : manifest.getSources();
         return collectSources(projectPath, declared, true);
     }
 
@@ -45,9 +45,11 @@ public final class SourceCollector {
 
         List<Path> out = new ArrayList<>();
         for (String folder : folders) {
-            Path dir = projectPath.resolve(folder).normalize();
-            if (Files.isDirectory(dir)) {
-                collect(dir, out);
+            Path entry = projectPath.resolve(folder).normalize();
+            if (Files.isDirectory(entry)) {
+                collect(entry, out);
+            } else if (Files.isRegularFile(entry) && SOURCE_EXTS.contains(extensionOf(entry))) {
+                out.add(entry);
             }
         }
         return out;

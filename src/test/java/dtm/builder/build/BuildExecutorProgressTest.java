@@ -25,7 +25,7 @@ class BuildExecutorProgressTest {
         Files.writeString(src.resolve("app.h"), "int app();");
 
         ManifestRootModel manifest = new ManifestRootModel();
-        manifest.setSourceFolders(List.of("src"));
+        manifest.setSources(List.of("src"));
         TargetGraph graph = TargetGraph.of(
                 TargetResolver.resolve(manifest, project, false).targets());
 

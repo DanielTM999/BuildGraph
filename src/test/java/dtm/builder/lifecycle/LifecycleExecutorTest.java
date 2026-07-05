@@ -31,7 +31,7 @@ class LifecycleExecutorTest {
         ManifestTargetModel target = new ManifestTargetModel();
         target.setId("core");
         target.setType("static");
-        target.setSourceFolders(List.of("src"));
+        target.setSources(List.of("src"));
         ManifestRootModel manifest = new ManifestRootModel();
         manifest.setTargets(List.of(target));
 

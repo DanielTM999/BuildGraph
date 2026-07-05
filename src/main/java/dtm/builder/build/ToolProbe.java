@@ -1,6 +1,7 @@
 package dtm.builder.build;
 
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -23,11 +24,17 @@ public final class ToolProbe {
             return null;
         }
 
-        Path direct = Paths.get(executable);
-        if (direct.isAbsolute() || executable.contains("/") || executable.contains("\\")) {
-            if (Files.isRegularFile(direct)) {
-                return direct;
-            }
+        Path direct;
+        try {
+            direct = Paths.get(executable);
+        } catch (InvalidPathException e) {
+            return null;
+        }
+        boolean looksLikePath = direct.isAbsolute() || executable.contains("/") || executable.contains("\\");
+        if (looksLikePath) {
+            // Ja e um caminho (absoluto ou com separador); nao faz sentido
+            // combina-lo com entradas do PATH, entao resolve apenas aqui.
+            return Files.isRegularFile(direct) ? direct : null;
         }
 
         String pathEnv = System.getenv("PATH");
@@ -46,9 +53,13 @@ public final class ToolProbe {
                 continue;
             }
             for (String candidate : candidates) {
-                Path p = Paths.get(dir, candidate);
-                if (Files.isRegularFile(p)) {
-                    return p;
+                try {
+                    Path p = Paths.get(dir, candidate);
+                    if (Files.isRegularFile(p)) {
+                        return p;
+                    }
+                } catch (InvalidPathException e) {
+                    // Entrada de PATH ou candidato invalido; ignora e segue tentando.
                 }
             }
         }

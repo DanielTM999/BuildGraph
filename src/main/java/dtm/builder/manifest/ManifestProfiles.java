@@ -27,8 +27,8 @@ public final class ManifestProfiles {
 
         if (profile == null) {
             copyScalars(out, raw, null);
-            out.setSourceFolders(new ArrayList<>(raw.getSourceFolders()));
-            out.setIncludePaths(new ArrayList<>(raw.getIncludePaths()));
+            out.setSources(new ArrayList<>(raw.getSources()));
+            out.setIncludes(new ArrayList<>(raw.getIncludes()));
             out.setDefines(new ArrayList<>(raw.getDefines()));
             out.setLibraryPaths(new ArrayList<>(raw.getLibraryPaths()));
             out.setCompileFlags(new ArrayList<>(raw.getCompileFlags()));
@@ -45,10 +45,10 @@ public final class ManifestProfiles {
         }
 
         copyScalars(out, raw, profile);
-        out.setSourceFolders(ManifestMerge.mergeAdditive(raw.getSourceFolders(),
-                profile.getSourceFolders(), profile.getExcludeSourceFolders()));
-        out.setIncludePaths(ManifestMerge.mergeAdditive(raw.getIncludePaths(),
-                profile.getIncludePaths(), profile.getExcludeIncludePaths()));
+        out.setSources(ManifestMerge.mergeAdditive(raw.getSources(),
+                profile.getSources(), profile.getExcludeSources()));
+        out.setIncludes(ManifestMerge.mergeAdditive(raw.getIncludes(),
+                profile.getIncludes(), profile.getExcludeIncludes()));
         out.setDefines(ManifestMerge.mergeAdditive(raw.getDefines(), profile.getDefines(),
                 profile.getExcludeDefines()));
         out.setLibraryPaths(ManifestMerge.mergeAdditive(raw.getLibraryPaths(),

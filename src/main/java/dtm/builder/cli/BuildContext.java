@@ -197,6 +197,12 @@ public final class BuildContext {
                 ? activeProfile.getBuildType() : "Debug";
 
         BuildSystem buildSystem = BuildSystemDetector.detect(projectPath, hasManifest);
+        if (!hasManifest && buildSystem == BuildSystem.DEFAULT) {
+            printer.println(Severity.WARNING,
+                    "Nenhum Manifest.json/Manifest.xml, CMakeLists.txt, meson.build ou Makefile "
+                            + "encontrado em {}; tentando build direto com descoberta automatica de fontes C/C++",
+                    projectPath);
+        }
         Toolchain toolchain = ToolchainDetector.resolve(effective, compilerOverride);
         Path packagesDir = configuration.packagesDir();
         Path buildDir = ProjectManifestFiles.resolveBuildDir(projectPath,

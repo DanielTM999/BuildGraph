@@ -31,10 +31,10 @@ class ManifestParserTest {
               "name": "MyProjectTeste",
               "version": "1.0.0",
               "cxxStandard": "cpp20",
-              "sourceFolders": ["src"],
+              "sources": ["src"],
               "testFolder": "specs",
               "testMain": "TestMain.cpp",
-              "includePaths": ["include"],
+              "includes": ["include"],
               "defines": ["APP=1"],
               "packages": [ { "id": "fmt", "version": "10.2.1" } ],
               "activeProfile": "dev",
@@ -52,7 +52,7 @@ class ManifestParserTest {
         ManifestRootModel m = result.getManifest();
         assertEquals("MyProjectTeste", m.getId());
         assertEquals("1.0.0", m.getVersion());
-        assertEquals(java.util.List.of("src"), m.getSourceFolders());
+        assertEquals(java.util.List.of("src"), m.getSources());
         assertEquals("specs", m.getTestFolder());
         assertEquals("TestMain.cpp", m.getTestMain());
         assertEquals(1, m.getPackages().size());
@@ -69,8 +69,8 @@ class ManifestParserTest {
                   <id>MyProjectTeste</id>
                   <name>MyProjectTeste</name>
                   <version>2.0.0</version>
-                  <sourceFolders>src</sourceFolders>
-                  <sourceFolders>lib</sourceFolders>
+                  <sources>src</sources>
+                  <sources>lib</sources>
                   <packages>
                     <id>fmt</id>
                     <version>10.2.1</version>
@@ -99,7 +99,7 @@ class ManifestParserTest {
         ManifestRootModel m = result.getManifest();
         assertEquals("MyProjectTeste", m.getId());
         assertEquals("2.0.0", m.getVersion());
-        assertEquals(java.util.List.of("src", "lib"), m.getSourceFolders());
+        assertEquals(java.util.List.of("src", "lib"), m.getSources());
         assertEquals(1, m.getPackages().size());
         assertEquals("fmt", m.getPackages().get(0).getId());
         assertEquals(2, m.getTasks().size());

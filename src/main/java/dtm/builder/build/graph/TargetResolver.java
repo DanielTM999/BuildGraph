@@ -40,10 +40,10 @@ public final class TargetResolver {
             String name = (t.getName() == null || t.getName().isBlank()) ? id : t.getName().trim();
             TargetType type = TargetType.parse(t.getType());
 
-            List<String> sources = ManifestMerge.mergeAdditive(effective.getSourceFolders(),
-                    t.getSourceFolders(), t.getExcludeSourceFolders());
+            List<String> sources = ManifestMerge.mergeAdditive(effective.getSources(),
+                    t.getSources(), t.getExcludeSources());
             if (sources.isEmpty()) {
-                errors.add("target '" + id + "' sem sourceFolders efetivos"
+                errors.add("target '" + id + "' sem sources efetivos"
                         + " (declare no target ou na raiz do manifest)");
             }
 
@@ -52,8 +52,8 @@ public final class TargetResolver {
                     name,
                     type,
                     sources,
-                    ManifestMerge.mergeAdditive(effective.getIncludePaths(),
-                            t.getIncludePaths(), t.getExcludeIncludePaths()),
+                    ManifestMerge.mergeAdditive(effective.getIncludes(),
+                            t.getIncludes(), t.getExcludeIncludes()),
                     ManifestMerge.mergeAdditive(effective.getDefines(),
                             t.getDefines(), t.getExcludeDefines()),
                     ManifestMerge.concat(effective.getCompileFlags(), t.getCompileFlags()),
@@ -96,8 +96,8 @@ public final class TargetResolver {
         out.setTestFolder(effective.getTestFolder());
         out.setTestMain(effective.getTestMain());
         out.setRepositories(new ArrayList<>(effective.getRepositories()));
-        out.setSourceFolders(new ArrayList<>(target.sourceFolders()));
-        out.setIncludePaths(new ArrayList<>(target.includePaths()));
+        out.setSources(new ArrayList<>(target.sources()));
+        out.setIncludes(new ArrayList<>(target.includes()));
         out.setDefines(new ArrayList<>(target.defines()));
         out.setCompileFlags(new ArrayList<>(target.compileFlags()));
         out.setLinkFlags(new ArrayList<>(target.linkFlags()));
@@ -129,8 +129,8 @@ public final class TargetResolver {
                 base,
                 base,
                 library ? TargetType.SHARED : TargetType.EXECUTABLE,
-                effective == null ? List.of() : effective.getSourceFolders(),
-                effective == null ? List.of() : effective.getIncludePaths(),
+                effective == null ? List.of() : effective.getSources(),
+                effective == null ? List.of() : effective.getIncludes(),
                 effective == null ? List.of() : effective.getDefines(),
                 effective == null ? List.of() : effective.getCompileFlags(),
                 effective == null ? List.of() : effective.getLinkFlags(),

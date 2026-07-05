@@ -32,11 +32,11 @@ public class ManifestProfileModel {
 
     @JsonSetter(nulls = Nulls.SKIP)
     @JacksonXmlElementWrapper(useWrapping = false)
-    private List<String> includePaths = new ArrayList<>();
+    private List<String> includes = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
     @JacksonXmlElementWrapper(useWrapping = false)
-    private List<String> sourceFolders = new ArrayList<>();
+    private List<String> sources = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
     @JacksonXmlElementWrapper(useWrapping = false)
@@ -56,11 +56,11 @@ public class ManifestProfileModel {
 
     @JsonSetter(nulls = Nulls.SKIP)
     @JacksonXmlElementWrapper(useWrapping = false)
-    private List<String> excludeIncludePaths = new ArrayList<>();
+    private List<String> excludeIncludes = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
     @JacksonXmlElementWrapper(useWrapping = false)
-    private List<String> excludeSourceFolders = new ArrayList<>();
+    private List<String> excludeSources = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
     @JacksonXmlElementWrapper(useWrapping = false)
@@ -184,20 +184,20 @@ public class ManifestProfileModel {
         this.repositories = repositories != null ? repositories : new ArrayList<>();
     }
 
-    public List<String> getIncludePaths() {
-        return includePaths;
+    public List<String> getIncludes() {
+        return includes;
     }
 
-    public void setIncludePaths(List<String> includePaths) {
-        this.includePaths = includePaths != null ? includePaths : new ArrayList<>();
+    public void setIncludes(List<String> includes) {
+        this.includes = includes != null ? includes : new ArrayList<>();
     }
 
-    public List<String> getSourceFolders() {
-        return sourceFolders;
+    public List<String> getSources() {
+        return sources;
     }
 
-    public void setSourceFolders(List<String> sourceFolders) {
-        this.sourceFolders = sourceFolders != null ? sourceFolders : new ArrayList<>();
+    public void setSources(List<String> sources) {
+        this.sources = sources != null ? sources : new ArrayList<>();
     }
 
     public List<String> getDefines() {
@@ -232,20 +232,20 @@ public class ManifestProfileModel {
         this.libraryPaths = libraryPaths != null ? libraryPaths : new ArrayList<>();
     }
 
-    public List<String> getExcludeIncludePaths() {
-        return excludeIncludePaths;
+    public List<String> getExcludeIncludes() {
+        return excludeIncludes;
     }
 
-    public void setExcludeIncludePaths(List<String> excludeIncludePaths) {
-        this.excludeIncludePaths = excludeIncludePaths != null ? excludeIncludePaths : new ArrayList<>();
+    public void setExcludeIncludes(List<String> excludeIncludes) {
+        this.excludeIncludes = excludeIncludes != null ? excludeIncludes : new ArrayList<>();
     }
 
-    public List<String> getExcludeSourceFolders() {
-        return excludeSourceFolders;
+    public List<String> getExcludeSources() {
+        return excludeSources;
     }
 
-    public void setExcludeSourceFolders(List<String> excludeSourceFolders) {
-        this.excludeSourceFolders = excludeSourceFolders != null ? excludeSourceFolders : new ArrayList<>();
+    public void setExcludeSources(List<String> excludeSources) {
+        this.excludeSources = excludeSources != null ? excludeSources : new ArrayList<>();
     }
 
     public List<String> getExcludeDefines() {

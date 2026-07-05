@@ -13,7 +13,7 @@ class ManifestProfilesTest {
               "compilerVersion": "c++17",
               "platform": "x86_64-pc-windows-msvc",
               "toolchainVersion": "17.0.0",
-              "includePaths": ["include"],
+              "includes": ["include"],
               "defines": ["APP=1"],
               "properties": { "base": "root" },
               "repositories": ["repo/base", "repo/shared"],
@@ -23,8 +23,8 @@ class ManifestProfilesTest {
                 "arm": {
                   "platform": "linux-arm64",
                   "compilerVersion": "c++20",
-                  "includePaths": ["extra/inc"],
-                  "excludeIncludePaths": ["include"],
+                  "includes": ["extra/inc"],
+                  "excludeIncludes": ["include"],
                   "defines": ["ARM=1"],
                   "properties": { "flavor": "embedded" },
                   "repositories": ["repo/shared", "repo/arm"],
@@ -43,7 +43,7 @@ class ManifestProfilesTest {
         assertEquals("c++20", eff.getCompilerVersion());
         assertEquals("17.0.0", eff.getToolchainVersion());
 
-        assertEquals(java.util.List.of("extra/inc"), eff.getIncludePaths());
+        assertEquals(java.util.List.of("extra/inc"), eff.getIncludes());
 
         assertTrue(eff.getDefines().contains("APP=1"));
         assertTrue(eff.getDefines().contains("ARM=1"));
@@ -77,9 +77,9 @@ class ManifestProfilesTest {
     @Test
     void noProfileReturnsRootValues() {
         ManifestRootModel raw = ManifestParser.readManifest(
-                "{ \"platform\": \"host\", \"includePaths\": [\"inc\"] }", false).getManifest();
+                "{ \"platform\": \"host\", \"includes\": [\"inc\"] }", false).getManifest();
         ManifestRootModel eff = ManifestProfiles.effective(raw);
         assertEquals("host", eff.getPlatform());
-        assertEquals(java.util.List.of("inc"), eff.getIncludePaths());
+        assertEquals(java.util.List.of("inc"), eff.getIncludes());
     }
 }

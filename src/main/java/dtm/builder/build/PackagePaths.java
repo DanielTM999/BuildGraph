@@ -53,7 +53,7 @@ public final class PackagePaths {
                 }
                 try {
                     LibraryManifest lm = RepoJson.read(manifestFile, LibraryManifest.class);
-                    for (String inc : lm.getIncludePaths()) {
+                    for (String inc : lm.getIncludes()) {
                         addIfDir(out.includeDirs, pkgDir.resolve(inc).normalize());
                     }
                     for (String lib : lm.getLibraryPaths()) {

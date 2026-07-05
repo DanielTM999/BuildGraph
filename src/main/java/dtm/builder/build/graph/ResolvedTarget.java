@@ -14,8 +14,8 @@ public record ResolvedTarget(
         String id,
         String name,
         TargetType type,
-        List<String> sourceFolders,
-        List<String> includePaths,
+        List<String> sources,
+        List<String> includes,
         List<String> defines,
         List<String> compileFlags,
         List<String> linkFlags,
@@ -24,8 +24,8 @@ public record ResolvedTarget(
         boolean synthetic) {
 
     public ResolvedTarget {
-        sourceFolders = sourceFolders == null ? new ArrayList<>() : sourceFolders;
-        includePaths = includePaths == null ? new ArrayList<>() : includePaths;
+        sources = sources == null ? new ArrayList<>() : sources;
+        includes = includes == null ? new ArrayList<>() : includes;
         defines = defines == null ? new ArrayList<>() : defines;
         compileFlags = compileFlags == null ? new ArrayList<>() : compileFlags;
         linkFlags = linkFlags == null ? new ArrayList<>() : linkFlags;

@@ -76,7 +76,7 @@ public final class CompileCommandBuilder {
         for (Path inc : spec.extraIncludeDirs()) {
             cmd.add("-I" + inc);
         }
-        for (String inc : manifest.getIncludePaths()) {
+        for (String inc : manifest.getIncludes()) {
             cmd.add("-I" + spec.projectPath().resolve(inc).normalize());
         }
 
@@ -141,7 +141,7 @@ public final class CompileCommandBuilder {
         for (Path inc : spec.extraIncludeDirs()) {
             cmd.add("/I" + inc);
         }
-        for (String inc : manifest.getIncludePaths()) {
+        for (String inc : manifest.getIncludes()) {
             cmd.add("/I" + spec.projectPath().resolve(inc).normalize());
         }
         for (String define : manifest.getDefines()) {

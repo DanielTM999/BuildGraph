@@ -32,7 +32,7 @@ class BuildExecutorIncrementalTest {
 
         ManifestRootModel manifest = new ManifestRootModel();
         manifest.setName("app");
-        manifest.setSourceFolders(List.of("src"));
+        manifest.setSources(List.of("src"));
         AtomicInteger executions = new AtomicInteger();
         ProcessExecutor executor = (command, workingDir, env, output) -> {
             executions.incrementAndGet();
@@ -84,7 +84,7 @@ class BuildExecutorIncrementalTest {
 
         ManifestRootModel manifest = new ManifestRootModel();
         manifest.setName("app");
-        manifest.setSourceFolders(List.of("src"));
+        manifest.setSources(List.of("src"));
         AtomicInteger executions = new AtomicInteger();
         ProcessExecutor executor = (command, workingDir, env, output) -> {
             executions.incrementAndGet();

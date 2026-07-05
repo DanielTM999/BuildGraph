@@ -76,7 +76,7 @@ public final class TestRunner {
         List<Path> sources = new ArrayList<>(testSources);
         List<Path> projectSources = multiTarget
                 ? SourceCollector.collectSources(projectPath,
-                        manifest == null ? List.of() : manifest.getSourceFolders(), false)
+                        manifest == null ? List.of() : manifest.getSources(), false)
                 : SourceCollector.collectSources(projectPath, manifest);
         for (Path src : projectSources) {
             String name = src.getFileName().toString().toLowerCase();
@@ -108,8 +108,8 @@ public final class TestRunner {
                 if (!target.type().isLibrary()) {
                     continue;
                 }
-                testManifest.setIncludePaths(ManifestMerge.mergeAdditive(
-                        testManifest.getIncludePaths(), target.includePaths(), null));
+                testManifest.setIncludes(ManifestMerge.mergeAdditive(
+                        testManifest.getIncludes(), target.includes(), null));
                 Path libArtifact = Artifacts.artifactPath(buildDir, target.name(),
                         target.type(), msvc);
                 if (target.type() == TargetType.SHARED && !msvc) {
@@ -162,8 +162,8 @@ public final class TestRunner {
         out.setSysroot(manifest.getSysroot());
         out.setTestFolder(manifest.getTestFolder());
         out.setTestMain(manifest.getTestMain());
-        out.setSourceFolders(new ArrayList<>(manifest.getSourceFolders()));
-        out.setIncludePaths(new ArrayList<>(manifest.getIncludePaths()));
+        out.setSources(new ArrayList<>(manifest.getSources()));
+        out.setIncludes(new ArrayList<>(manifest.getIncludes()));
         out.setDefines(new ArrayList<>(manifest.getDefines()));
         out.setCompileFlags(new ArrayList<>(manifest.getCompileFlags()));
         out.setLinkFlags(new ArrayList<>(manifest.getLinkFlags()));

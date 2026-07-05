@@ -15,7 +15,7 @@ class CompileCommandBuilderTest {
         ManifestRootModel m = new ManifestRootModel();
         m.setName("app");
         m.setCxxStandard("cpp20");
-        m.setIncludePaths(new java.util.ArrayList<>(List.of("include")));
+        m.setIncludes(new java.util.ArrayList<>(List.of("include")));
         m.setDefines(new java.util.ArrayList<>(List.of("APP=1")));
         return m;
     }

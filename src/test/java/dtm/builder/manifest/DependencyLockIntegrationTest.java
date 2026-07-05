@@ -128,7 +128,7 @@ class DependencyLockIntegrationTest {
         manifest.setId(id);
         manifest.setName(id);
         manifest.setVersion(version);
-        manifest.setIncludePaths(List.of("include"));
+        manifest.setIncludes(List.of("include"));
         RepoJson.write(variant.resolve(GlobalRepository.GLOBAL_MANIFEST_FILE), manifest);
     }
 }

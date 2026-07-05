@@ -40,13 +40,13 @@ class TargetResolverTest {
     void targetsInheritRootListsAdditively() {
         TargetResolution r = TargetResolver.resolve(manifest("""
                 { "id": "vema", "version": "1",
-                  "sourceFolders": ["src/shared"],
-                  "includePaths": ["include"],
+                  "sources": ["src/shared"],
+                  "includes": ["include"],
                   "defines": ["BASE=1"],
                   "compileFlags": ["-Wall"],
                   "targets": [
                     { "id": "core", "type": "shared",
-                      "sourceFolders": ["src/core"],
+                      "sources": ["src/core"],
                       "defines": ["CORE=1"],
                       "compileFlags": ["-fvisibility=hidden"] }
                   ] }
@@ -54,8 +54,8 @@ class TargetResolverTest {
         assertTrue(r.isOk(), String.join("; ", r.errors()));
         assertTrue(r.multiTarget());
         ResolvedTarget core = r.targets().get(0);
-        assertEquals(List.of("src/shared", "src/core"), core.sourceFolders());
-        assertEquals(List.of("include"), core.includePaths());
+        assertEquals(List.of("src/shared", "src/core"), core.sources());
+        assertEquals(List.of("include"), core.includes());
         assertEquals(List.of("BASE=1", "CORE=1"), core.defines());
         assertEquals(List.of("-Wall", "-fvisibility=hidden"), core.compileFlags());
     }
@@ -64,25 +64,25 @@ class TargetResolverTest {
     void excludeRemovesInheritedRootSources() {
         TargetResolution r = TargetResolver.resolve(manifest("""
                 { "id": "vema", "version": "1",
-                  "sourceFolders": ["src/shared", "src/legacy"],
+                  "sources": ["src/shared", "src/legacy"],
                   "targets": [
                     { "id": "core", "type": "shared",
-                      "sourceFolders": ["src/core"],
-                      "excludeSourceFolders": ["src/legacy"] }
+                      "sources": ["src/core"],
+                      "excludeSources": ["src/legacy"] }
                   ] }
                 """), PROJECT, false);
         assertTrue(r.isOk());
-        assertEquals(List.of("src/shared", "src/core"), r.targets().get(0).sourceFolders());
+        assertEquals(List.of("src/shared", "src/core"), r.targets().get(0).sources());
     }
 
     @Test
     void profileTargetOverrideMergesById() {
         TargetResolution r = TargetResolver.resolve(manifest("""
                 { "id": "vema", "version": "1",
-                  "sourceFolders": ["src/shared"],
+                  "sources": ["src/shared"],
                   "activeProfile": "windows",
                   "targets": [
-                    { "id": "runtime", "sourceFolders": ["src/runtime"], "defines": ["A=1"] }
+                    { "id": "runtime", "sources": ["src/runtime"], "defines": ["A=1"] }
                   ],
                   "profiles": {
                     "windows": {
@@ -94,20 +94,20 @@ class TargetResolverTest {
         assertTrue(r.isOk(), String.join("; ", r.errors()));
         ResolvedTarget runtime = r.targets().get(0);
         assertEquals(List.of("OS_WIN=1", "A=1", "VEMA_WIN32"), runtime.defines());
-        assertEquals(List.of("src/shared", "src/runtime"), runtime.sourceFolders());
+        assertEquals(List.of("src/shared", "src/runtime"), runtime.sources());
     }
 
     @Test
     void profileCanAddNewTarget() {
         TargetResolution r = TargetResolver.resolve(manifest("""
                 { "id": "vema", "version": "1",
-                  "sourceFolders": ["src/shared"],
+                  "sources": ["src/shared"],
                   "activeProfile": "linux",
-                  "targets": [ { "id": "runtime", "sourceFolders": ["src/runtime"] } ],
+                  "targets": [ { "id": "runtime", "sources": ["src/runtime"] } ],
                   "profiles": {
                     "linux": {
                       "targets": [ { "id": "posix-shim", "type": "static",
-                                     "sourceFolders": ["src/posix"] } ]
+                                     "sources": ["src/posix"] } ]
                     }
                   } }
                 """), PROJECT, false);
@@ -120,7 +120,7 @@ class TargetResolverTest {
     @Test
     void reportsUnknownDependency() {
         TargetResolution r = TargetResolver.resolve(manifest("""
-                { "id": "x", "version": "1", "sourceFolders": ["src"],
+                { "id": "x", "version": "1", "sources": ["src"],
                   "targets": [ { "id": "a", "dependsOn": ["nope"] } ] }
                 """), PROJECT, false);
         assertFalse(r.isOk());
@@ -130,7 +130,7 @@ class TargetResolverTest {
     @Test
     void reportsDependencyOnExecutable() {
         TargetResolution r = TargetResolver.resolve(manifest("""
-                { "id": "x", "version": "1", "sourceFolders": ["src"],
+                { "id": "x", "version": "1", "sources": ["src"],
                   "targets": [
                     { "id": "tool" },
                     { "id": "app", "dependsOn": ["tool"] }
@@ -147,13 +147,13 @@ class TargetResolverTest {
                   "targets": [ { "id": "a" } ] }
                 """), PROJECT, false);
         assertFalse(r.isOk());
-        assertTrue(r.errors().get(0).contains("sourceFolders"));
+        assertTrue(r.errors().get(0).contains("sources"));
     }
 
     @Test
     void reportsArtifactNameCollision() {
         TargetResolution r = TargetResolver.resolve(manifest("""
-                { "id": "x", "version": "1", "sourceFolders": ["src"],
+                { "id": "x", "version": "1", "sources": ["src"],
                   "targets": [
                     { "id": "a", "name": "app" },
                     { "id": "b", "name": "app" }
