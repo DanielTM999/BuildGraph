@@ -22,7 +22,7 @@
         <revision>1.0.0-SNAPSHOT</revision>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <jackson.version>2.18.2</jackson.version>
+        <jackson.version>2.22.1</jackson.version>
         <junit.version>5.11.3</junit.version>
         <main.class>dtm.builder.Main</main.class>
         <skipNativeITs>true</skipNativeITs>
