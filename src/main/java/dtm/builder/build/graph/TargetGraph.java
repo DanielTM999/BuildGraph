@@ -10,12 +10,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Grafo de dependências entre targets (arestas dependsOn). Fornece ordem
- * topológica (Kahn), detecção de ciclos, o conjunto de targets prontos dado
- * o que já foi concluído (para o scheduler paralelo) e o fechamento
- * transitivo de um subconjunto (para --target).
- */
 public final class TargetGraph {
 
     private final Map<String, ResolvedTarget> byId = new LinkedHashMap<>();
@@ -42,7 +36,27 @@ public final class TargetGraph {
         return byId.values();
     }
 
-    /** Ids envolvidos em algum ciclo, vazio quando o grafo é acíclico. */
+    public List<ResolvedTarget> transitiveDependencies(ResolvedTarget target) {
+        if (target == null) {
+            return List.of();
+        }
+        Set<String> seen = new LinkedHashSet<>();
+        Deque<String> stack = new ArrayDeque<>(target.dependsOn());
+        List<ResolvedTarget> out = new ArrayList<>();
+        while (!stack.isEmpty()) {
+            String id = stack.pop();
+            if (!seen.add(id)) {
+                continue;
+            }
+            ResolvedTarget dep = byId.get(id);
+            if (dep != null) {
+                out.add(dep);
+                dep.dependsOn().forEach(stack::push);
+            }
+        }
+        return out;
+    }
+
     public List<String> cycle() {
         Map<String, Integer> pending = pendingDependencies();
         Deque<String> queue = new ArrayDeque<>();
@@ -76,7 +90,6 @@ public final class TargetGraph {
         return cyclic;
     }
 
-    /** Ordem topológica estável (declaração desempata). Exige grafo acíclico. */
     public List<ResolvedTarget> topologicalOrder() {
         Map<String, Integer> pending = pendingDependencies();
         List<ResolvedTarget> out = new ArrayList<>();
@@ -103,7 +116,6 @@ public final class TargetGraph {
         return out;
     }
 
-    /** Targets cujas dependências estão todas em {@code done} e que ainda não iniciaram. */
     public List<ResolvedTarget> ready(Set<String> done, Set<String> startedOrDone) {
         List<ResolvedTarget> out = new ArrayList<>();
         for (ResolvedTarget t : byId.values()) {
@@ -124,7 +136,6 @@ public final class TargetGraph {
         return out;
     }
 
-    /** Subconjunto pedido + dependências transitivas, como novo grafo. */
     public TargetGraph subsetWithDependencies(Collection<String> ids) {
         Set<String> keep = new LinkedHashSet<>();
         Deque<String> stack = new ArrayDeque<>();

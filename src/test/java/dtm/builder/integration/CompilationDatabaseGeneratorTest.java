@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import dtm.builder.build.Toolchain;
 import dtm.builder.build.ToolchainKind;
 import dtm.builder.manifest.model.ManifestRootModel;
+import dtm.builder.manifest.model.ManifestTargetModel;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -75,6 +76,37 @@ class CompilationDatabaseGeneratorTest {
         assertEquals("[]", json);
     }
 
+    @Test
+    void targetEntryIncludesTransitiveDependencyIncludes() throws Exception {
+        Files.createDirectories(project.resolve("src/base"));
+        Files.createDirectories(project.resolve("src/core"));
+        Files.createDirectories(project.resolve("src/app"));
+        Path baseInclude = Files.createDirectories(project.resolve("include/base"));
+        Path coreInclude = Files.createDirectories(project.resolve("include/core"));
+        Files.writeString(project.resolve("src/base/base.c"), "int base(void) { return 1; }");
+        Files.writeString(project.resolve("src/core/core.c"), "int core(void) { return 2; }");
+        Files.writeString(project.resolve("src/app/main.c"), "int main(void) { return 0; }");
+
+        ManifestRootModel manifest = new ManifestRootModel();
+        manifest.setTargets(new ArrayList<>(List.of(
+                target("base", "static", List.of("src/base"), List.of("include/base"),
+                        List.of()),
+                target("core", "static", List.of("src/core"), List.of("include/core"),
+                        List.of("base")),
+                target("app", "executable", List.of("src/app"), List.of(),
+                        List.of("core")))));
+        Toolchain toolchain = new Toolchain(ToolchainKind.CUSTOM,
+                Path.of("tool-gcc"), Path.of("tool-g++"));
+
+        String json = CompilationDatabaseGenerator.generate(project, manifest, toolchain,
+                project.resolve("packages"), project.resolve("build"), "Debug");
+        JsonNode entries = JsonMapper.builder().build().readTree(json);
+        List<String> appArgs = arguments(entryFor(entries, "main.c"));
+
+        assertTrue(appArgs.contains("-I" + coreInclude.toAbsolutePath().normalize()));
+        assertTrue(appArgs.contains("-I" + baseInclude.toAbsolutePath().normalize()));
+    }
+
     private static JsonNode entryFor(JsonNode entries, String fileName) {
         for (JsonNode entry : entries) {
             if (entry.get("file").asText().endsWith(fileName)) {
@@ -88,5 +120,16 @@ class CompilationDatabaseGeneratorTest {
         List<String> result = new ArrayList<>();
         entry.get("arguments").forEach(value -> result.add(value.asText()));
         return result;
+    }
+
+    private static ManifestTargetModel target(String id, String type, List<String> sources,
+                                              List<String> includes, List<String> dependsOn) {
+        ManifestTargetModel target = new ManifestTargetModel();
+        target.setId(id);
+        target.setType(type);
+        target.setSources(new ArrayList<>(sources));
+        target.setIncludes(new ArrayList<>(includes));
+        target.setDependsOn(new ArrayList<>(dependsOn));
+        return target;
     }
 }

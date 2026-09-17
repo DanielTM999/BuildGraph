@@ -15,13 +15,9 @@ import dtm.builder.manifest.model.ManifestRootModel;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Deque;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Consumer;
 
 public final class BuildExecutor {
@@ -149,7 +145,7 @@ public final class BuildExecutor {
         List<Path> extraSources = new ArrayList<>();
         List<Path> dependencyArtifacts = new ArrayList<>();
 
-        for (ResolvedTarget dep : transitiveDependencies(graph, target)) {
+        for (ResolvedTarget dep : graph.transitiveDependencies(target)) {
             targetManifest.setIncludes(ManifestMerge.mergeAdditive(
                     targetManifest.getIncludes(), dep.includes(), null));
             Path depArtifact = Artifacts.artifactPath(req.buildDir(), dep.name(), dep.type(), msvc);
@@ -375,25 +371,6 @@ public final class BuildExecutor {
                 output.accept(message);
             }
         }
-    }
-
-    private static List<ResolvedTarget> transitiveDependencies(TargetGraph graph,
-                                                               ResolvedTarget target) {
-        Set<String> seen = new LinkedHashSet<>();
-        Deque<String> stack = new ArrayDeque<>(target.dependsOn());
-        List<ResolvedTarget> out = new ArrayList<>();
-        while (!stack.isEmpty()) {
-            String id = stack.pop();
-            if (!seen.add(id)) {
-                continue;
-            }
-            ResolvedTarget dep = graph.target(id);
-            if (dep != null) {
-                out.add(dep);
-                dep.dependsOn().forEach(stack::push);
-            }
-        }
-        return out;
     }
 
     private static BuildResult cmake(BuildRequest req) {

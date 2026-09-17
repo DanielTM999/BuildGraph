@@ -9,8 +9,10 @@ import dtm.builder.build.SourceCollector;
 import dtm.builder.build.TargetType;
 import dtm.builder.build.Toolchain;
 import dtm.builder.build.graph.ResolvedTarget;
+import dtm.builder.build.graph.TargetGraph;
 import dtm.builder.build.graph.TargetResolution;
 import dtm.builder.build.graph.TargetResolver;
+import dtm.builder.manifest.ManifestMerge;
 import dtm.builder.manifest.model.ManifestRootModel;
 
 import java.nio.file.Path;
@@ -32,8 +34,6 @@ public final class CompilationDatabaseGenerator {
         TargetResolution resolution = TargetResolver.resolve(manifest, projectPath,
                 toolchain != null && toolchain.isMsvc());
 
-        // clangd espera uma entrada por arquivo; em fontes compartilhadas
-        // entre targets, o primeiro target declarado vence.
         Map<Path, ResolvedTarget> sourcesByTarget = new LinkedHashMap<>();
         for (ResolvedTarget target : resolution.targets()) {
             for (Path source : SourceCollector.collectSources(projectPath,
@@ -48,6 +48,7 @@ public final class CompilationDatabaseGenerator {
             throw new IllegalStateException("Nenhuma toolchain C/C++ encontrada");
         }
 
+        TargetGraph graph = TargetGraph.of(resolution.targets());
         PackagePaths packagePaths = PackagePaths.resolve(packagesDir);
         List<Entry> entries = new ArrayList<>();
         int index = 0;
@@ -58,6 +59,12 @@ public final class CompilationDatabaseGenerator {
             ManifestRootModel targetManifest = manifest == null || target.synthetic()
                     ? manifest
                     : TargetResolver.perTargetManifest(manifest, target);
+            if (targetManifest != null && !target.synthetic()) {
+                for (ResolvedTarget dep : graph.transitiveDependencies(target)) {
+                    targetManifest.setIncludes(ManifestMerge.mergeAdditive(
+                            targetManifest.getIncludes(), dep.includes(), null));
+                }
+            }
             boolean cpp = SourceCollector.isCppSources(List.of(source));
             String extension = toolchain.isMsvc() ? ".obj" : ".o";
             String base = sanitize(source.getFileName().toString());
