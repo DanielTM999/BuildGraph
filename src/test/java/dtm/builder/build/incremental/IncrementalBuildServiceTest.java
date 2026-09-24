@@ -7,6 +7,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -40,6 +41,26 @@ class IncrementalBuildServiceTest {
 
         Files.writeString(header, "#define VALUE 2");
         assertFalse(second.isObjectUpToDate(second.begin("app"), source, object, command));
+    }
+
+    @Test
+    void detectsSameSizeEditWithinTimestampGranularity() throws Exception {
+        Path compiler = Files.writeString(temp.resolve("cc"), "compiler");
+        Path source = Files.writeString(temp.resolve("main.c"), "#include \"value.h\"");
+        Path header = Files.writeString(temp.resolve("value.h"), "#define VALUE 1");
+        Path object = Files.writeString(temp.resolve("main.o"), "object");
+        List<String> command = List.of(compiler.toString(), "-c", source.toString());
+        Toolchain toolchain = new Toolchain(ToolchainKind.CUSTOM, compiler, compiler);
+        FileTime modified = Files.getLastModifiedTime(header);
+
+        IncrementalBuildService service = new IncrementalBuildService(temp, toolchain, "Debug", true);
+        TargetState initial = service.begin("app");
+        service.recordCompiled(initial, source, object, command, List.of(header));
+        service.finish(initial, null);
+
+        Files.writeString(header, "#define VALUE 2");
+        Files.setLastModifiedTime(header, modified);
+        assertFalse(service.isObjectUpToDate(service.begin("app"), source, object, command));
     }
 
     @Test

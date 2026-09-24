@@ -13,11 +13,16 @@ import java.util.List;
 
 public final class FileHasher {
 
+    static final long RACY_WINDOW_MILLIS = 2000;
+    static final String RACY = "racy";
+
     /** Carimbo "tamanho|mtime|sha256"; tamanho+mtime servem de fast-path na comparacao. */
     public String stamp(Path file) throws IOException {
         Path key = file.toAbsolutePath().normalize();
         BasicFileAttributes attrs = Files.readAttributes(key, BasicFileAttributes.class);
-        return attrs.size() + "|" + attrs.lastModifiedTime().toMillis() + "|" + sha256(key);
+        long modified = attrs.lastModifiedTime().toMillis();
+        String mtime = System.currentTimeMillis() - modified < RACY_WINDOW_MILLIS ? RACY : String.valueOf(modified);
+        return attrs.size() + "|" + mtime + "|" + sha256(key);
     }
 
     /** true se o conteudo do arquivo ainda corresponde ao carimbo gravado. */
