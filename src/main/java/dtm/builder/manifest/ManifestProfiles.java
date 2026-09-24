@@ -19,6 +19,7 @@ public final class ManifestProfiles {
 
         ManifestProfileModel profile = activeProfile(raw);
         ManifestRootModel out = new ManifestRootModel();
+        dtm.builder.manifest.model.NativeOptions.merge(raw, profile, out);
 
         out.setId(raw.getId());
         out.setName(raw.getName());

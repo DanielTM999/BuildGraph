@@ -24,10 +24,21 @@ public record LifecycleContext(
         Consumer<String> info,
         int jobs,
         List<String> onlyTargets,
-        boolean incremental) {
+        boolean incremental,
+        dtm.builder.build.ProcessExecutor executor) {
 
     public LifecycleContext {
         onlyTargets = onlyTargets == null ? List.of() : onlyTargets;
+        executor = executor == null ? dtm.builder.build.ProcessExecutor.REAL : executor;
+    }
+
+    public LifecycleContext(Path projectPath, ManifestRootModel manifest, Toolchain toolchain,
+                            BuildSystem buildSystem, GlobalRepository repo, Path packagesDir,
+                            Path buildDir, String buildMode, PlaceholderResolver placeholders,
+                            Consumer<String> output, Consumer<String> info, int jobs,
+                            List<String> onlyTargets, boolean incremental) {
+        this(projectPath, manifest, toolchain, buildSystem, repo, packagesDir, buildDir, buildMode,
+                placeholders, output, info, jobs, onlyTargets, incremental, null);
     }
 
     public LifecycleContext(Path projectPath, ManifestRootModel manifest, Toolchain toolchain,

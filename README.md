@@ -18,6 +18,7 @@ profiles incrementais, resolução de packages, tarefas de lifecycle e repositó
 - [Sistemas de build](#sistemas-de-build)
 - [Fontes, testes e artefatos](#fontes-testes-e-artefatos)
 - [Lifecycle e instalação](#lifecycle-e-instalação)
+- [Assembly e projetos mistos](#assembly-e-projetos-mistos)
 - [Build a partir do código-fonte](#build-a-partir-do-código-fonte)
 - [Versionamento e releases](#versionamento-e-releases)
 - [Licença](#licença)
@@ -60,6 +61,7 @@ BuildGraph executa `build`.
 | `clean` | Remove o diretório de build. |
 | `build` | Compila o projeto. |
 | `test` | Executa build e testes. |
+| `package` | Alias de `build`; aceita a mesma seleção por `--target`. |
 | `install` | Executa build e publica o projeto no primeiro repositório configurado. |
 | `refresh` | Resolve e materializa os packages do manifest. |
 | `lock` | Resolve versões e grava `BuildGraph.lock.json` sem materializar packages. |
@@ -70,7 +72,7 @@ BuildGraph executa `build`.
 | `--repo`, `--external` | Repositório adicional, depois dos repositórios do manifest. |
 | `--packages`, `--out` | Pasta local usada quando `packagesBase` não está configurado. |
 | `--compile-commands`, `--clangd` | Imprime um `compile_commands.json` resolvido no stdout e encerra. |
-| `-t`, `--target` | Builda apenas o target indicado e suas dependências. Repetível ou separado por vírgula. |
+| `-t`, `--target` | Limita build/package, clean, install e bibliotecas dos testes ao target e suas dependências. Repetível ou separado por vírgula. |
 | `-j`, `--jobs` | Limita o paralelismo entre targets (`-j 1` = serial). Default: número de CPUs. |
 | `--no-incremental` | Ignora o estado incremental, recompila todas as fontes e regrava o cache. |
 
@@ -365,7 +367,7 @@ Campos desconhecidos são ignorados. Listas e mapas nulos são tratados como vaz
 | `cStandard` | string | Padrão C, por exemplo `c11`, `c17` ou `c23`. |
 | `cxxStandard` | string | Padrão C++, por exemplo `c++17`, `c++20` ou `c++23`. |
 | `compilerVersion` | string | Fallback legado para o padrão da linguagem; não é o caminho do compilador. |
-| `platform` | string | Target/triple de plataforma usado quando aplicável. |
+| `platform` | string | Arquitetura/triple de destino; herdado pelos targets. Ausente ou inválido usa a máquina local. |
 | `toolchainVersion` | string | Metadata de versão da toolchain disponível para profiles/placeholders. |
 | `sysroot` | string | Caminho passado como `--sysroot` em compiladores compatíveis. |
 | `sources` | string[] | Pastas ou arquivos de fonte C/C++ relativos ao projeto. |
@@ -477,10 +479,15 @@ Campos de cada target:
 | --- | --- | --- |
 | `id` | string | Obrigatório e único. Identifica o target no grafo, em `--target` e na pasta de intermediários. |
 | `name` | string | Nome-base do artefato; default é o `id`. |
-| `type` | string | `executable` (default), `shared` (`.dll`/`.so`/`.dylib`) ou `static` (`.a`/`.lib`). |
+| `type` | string | `executable` (default), `shared`, `static`, `object` (uma fonte) ou `binary` (binário puro). |
 | `sources` | string[] | Somadas às da raiz; `excludeSources` remove herdadas. |
 | `includes`, `defines` | string[] | Somados aos da raiz; `excludeIncludes`/`excludeDefines` removem herdados. |
-| `compileFlags`, `linkFlags` | string[] | Concatenados aos da raiz. |
+| `compileFlags`, `asmFlags`, `linkFlags` | string[] | Concatenados aos da raiz; aplicados respectivamente a C/C++, ASM e link. |
+| `platform` | string | Destino do target; sobrescreve raiz/profile. Ausente ou inválido usa a máquina local. |
+| `asmFormat` | string | Formato do assembler: `auto` (default), `bin`, `elf32`, `elf64`, `win32`, `win64`, `macho32` ou `macho64`, conforme o destino e a ferramenta. |
+| `outputName` | string | Caminho relativo da saída dentro de `outputDir`; default segue nome, tipo e plataforma do target. |
+| `linkMode` | string | `auto` (default), `driver` ou `linker`. |
+| `linkDependencies` | string[] | Arquivos adicionais, como linker scripts, rastreados pelo cache do link. |
 | `libraryPaths` | string[] | Somados aos da raiz. |
 | `dependsOn` | string[] | Ids de outros targets: define a ordem de build e o link automático. |
 
@@ -493,10 +500,10 @@ Regras:
 - **Profiles × targets**: `profiles.<nome>.targets` é combinado por `id` com os targets da raiz
   (listas somam, scalars sobrescrevem); um `id` novo adiciona um target. A ordem final de
   composição é raiz → profile → target → override do profile no target.
-- **Dependências**: `dependsOn` builda o dep antes e linka automaticamente — shared vira
-  `-L<outputDir> -l<name>`, static entra pelo caminho completo do `.a`/`.lib`. Os `includes`
-  do dep são herdados (transitivamente). Dependências devem ser `shared` ou `static`; ciclos e
-  ids desconhecidos são erros.
+- **Dependências**: `dependsOn` constrói o alvo antes. Bibliotecas e objetos participam do link
+  pelos caminhos dos artefatos; DLLs com linker MSVC usam a import library. Executáveis e binários
+  estabelecem somente ordem. Objetos já incorporados em bibliotecas não são repetidos no link.
+  Includes são herdados das dependências linkadas. Ciclos e IDs desconhecidos são erros.
 - **Paralelismo**: targets independentes no grafo compilam em paralelo por padrão (limite =
   número de CPUs). `-j N` limita; `-j 1` força serial. Na primeira falha nenhum target novo é
   iniciado (fail-fast). Logs são prefixados com `[targetId]`.
@@ -831,7 +838,26 @@ Os modos são:
 Cada fase executa suas tasks `before`, depois a operação da fase e finalmente suas tasks `after`.
 Uma falha interrompe as fases seguintes.
 
-`clean` remove todo o diretório de build efetivo. `install` exige `id` ou `name` e também `version`.
+`package` é um alias de `build`, inclusive nas tasks e no modo interativo; não cria um arquivo
+de distribuição nem uma segunda execução dos hooks. `build package` executa a fase uma vez.
+
+```shell
+buildGraph package --target app
+buildGraph clean package --target app
+buildGraph install --target core
+buildGraph test --target core
+```
+
+Com `--target`, a cadeia inclui o alvo e suas dependências transitivas. `clean` remove apenas
+suas saídas, intermediários e cache, incluindo nomes de saída anteriores registrados pelo build.
+`install` publica somente bibliotecas dessa cadeia. `test` mantém a suíte global do projeto,
+mas restringe os objetos e bibliotecas usados no link à cadeia selecionada. Um teste global que
+precise de outra biblioteca exige incluí-la na seleção. Tasks e packages externos continuam globais.
+Os backends CMake/Meson/Make rejeitam `--target`; essa seleção pertence ao build direto.
+
+No modo interativo, `package --target app` substitui a seleção inicial apenas para aquela linha.
+
+Sem seleção, `clean` remove todo o diretório de build efetivo. `install` exige `id` ou `name` e também `version`.
 Ele publica os includes existentes e o artefato compilado em:
 
 ```text
@@ -843,6 +869,73 @@ Ele publica os includes existentes e o artefato compilado em:
 Esse package passa a poder ser resolvido por outros projetos que apontem para o mesmo repositório.
 
 ## Build a partir do código-fonte
+
+### Assembly e projetos mistos
+
+C, C++ e ASM podem coexistir no mesmo projeto e no mesmo target, em qualquer combinação.
+Cada fonte usa sua própria ferramenta: `.asm` usa NASM por padrão; `.s`/`.S` usam GNU assembler.
+Para fontes MASM, configure `asmKind: "masm"`. Um target usa uma família de assembler; para
+combinar dialetos incompatíveis, declare targets separados e conecte seus objetos/bibliotecas.
+Fontes `.S` exigem pré-processamento GCC/Clang; demais fontes ASM não exigem compilador C/C++.
+
+Os campos abaixo aceitam nome no PATH ou caminho de executável; argumentos ficam nas listas de flags:
+
+| Campo | Uso |
+| --- | --- |
+| `asmCompiler` | Executável do assembler; exemplos: `nasm`, `aarch64-linux-gnu-as`, `ml64.exe`. |
+| `asmKind` | `nasm`, `gas` ou `masm`; inferido para nomes conhecidos, obrigatório para wrappers personalizados. |
+| `linker` | Executável de link direto; exemplos: `ld`, `ld.lld`, `link.exe`, `lld-link.exe`. |
+| `linkerKind` | `gnu`, `msvc` ou `darwin`; inferido para nomes conhecidos. |
+| `archiver` | Executável para bibliotecas estáticas, como `ar`, `llvm-ar` ou `lib.exe`. |
+| `objcopy` | Conversão da imagem linkada para binário puro; exemplos: `objcopy`, `llvm-objcopy`. |
+
+Esses campos, `asmFlags` e `linkDependencies` podem ser declarados na raiz, nos profiles e nos
+targets. Os targets herdam os valores globais e podem sobrescrevê-los. JSON e XML têm o mesmo
+comportamento; listas XML usam `<asmFlags><asmFlag>...</asmFlag></asmFlags>` e
+`<linkDependencies><linkDependency>...</linkDependency></linkDependencies>`.
+
+```json
+{
+  "cCompiler": "gcc",
+  "cxxCompiler": "g++",
+  "asmCompiler": "nasm",
+  "linker": "ld",
+  "platform": "x86_64-linux-gnu",
+  "targets": [
+    { "id": "boot", "type": "binary", "sources": ["boot/boot.asm"],
+      "asmFormat": "bin", "outputName": "boot.bin" },
+    { "id": "fast", "type": "object", "sources": ["asm/fast.asm"] },
+    { "id": "app", "type": "executable", "sources": ["src/main.cpp", "src/support.c"],
+      "dependsOn": ["fast"], "asmFlags": ["-g"], "linkFlags": ["-pthread"] }
+  ]
+}
+```
+
+`linkMode: auto` escolhe o driver C++ se houver C++ no target ou nas dependências linkadas,
+o driver C quando houver C e o linker global para ASM puro. `linkMode: linker` força o linker
+direto também para C/C++; nesse modo, configure runtime, bibliotecas e entry point necessários
+em `linkFlags`. Flags são argumentos literais, sem tradução entre sintaxes de drivers e linkers.
+
+`type: binary` com NASM e `asmFormat: bin` monta uma única fonte principal diretamente, sem linker.
+Use `%include` para dividir esse programa em vários arquivos. Nos demais casos, o build monta/compila
+os objetos, linka uma imagem intermediária e chama `objcopy -O binary`. Por exemplo, um kernel
+pode usar `linkMode: linker`, `linkFlags: ["-T", "kernel.ld"]` e
+`linkDependencies: ["kernel.ld"]`. `type: object` aceita uma fonte; vários objetos podem ser
+agrupados em targets `static` ou linkados em `executable`, `shared` e `binary`.
+
+`platform` aceita arquiteturas como `x86_64`, `arm64` e `riscv64`, ou triples como
+`aarch64-linux-gnu`, `riscv32-none-elf` e `x86_64-pc-windows-msvc`. Triples têm vocabulário de
+arquitetura aberto; a toolchain determina os destinos disponíveis. Ausência usa o host; valor
+inválido gera aviso e usa o host. Ferramenta incompatível com um destino válido produz erro,
+sem retornar silenciosamente ao host. NASM e MASM continuam limitados às arquiteturas próprias
+dessas ferramentas. Para cross-compilation, configure os executáveis cruzados ou disponibilize
+os nomes `<triple>-as`, `<triple>-ld`, `<triple>-ar` e `<triple>-objcopy` no PATH.
+
+Includes ASM são rastreados por depfiles NASM/GNU. MASM remonta conservadoramente quando não há
+dependências confiáveis. O cache também considera ferramentas, formato e plataforma; caches de
+versões anteriores são reconstruídos. `compile_commands.json` continua dedicado às fontes C/C++.
+
+### Compilar o BuildGraph
 
 Requisitos:
 
@@ -866,6 +959,17 @@ mvn verify -Pnative-it-msvc
 
 Para MSVC, execute o comando em um Developer Command Prompt ou carregue o ambiente do Visual
 Studio antes do Maven. Ausência da toolchain faz o profile falhar explicitamente.
+
+Os testes `AssemblyToolchainNativeIT` verificam NASM, GNU, MASM e um binário misto com Clang/LLD.
+Backends ausentes são reportados como testes ignorados. Para configurar caminhos explicitamente:
+
+```shell
+mvn verify -DskipNativeITs=false -Dit.test=AssemblyToolchainNativeIT -Dbuildgraph.it.nasm=/path/to/nasm
+```
+
+Também estão disponíveis `buildgraph.it.clang`, `buildgraph.it.ld`, `buildgraph.it.objcopy`,
+`buildgraph.it.masm`, `buildgraph.it.gas`, `buildgraph.it.gasCompiler` e `buildgraph.it.gasPlatform`. O workflow
+`native-toolchains.yml` cobre Linux/GNU/NASM e Windows/MSVC/MASM, além de montagem cruzada RISC-V.
 
 O pacote Java raiz é `dtm.builder`; integrações que iniciam a classe principal diretamente devem
 usar `dtm.builder.Main`.

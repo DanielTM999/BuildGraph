@@ -61,11 +61,11 @@ public final class TargetResolver {
                     ManifestMerge.mergeAdditive(effective.getLibraryPaths(),
                             t.getLibraryPaths(), null),
                     trimmed(t.getDependsOn()),
-                    false));
+                    false, t));
         }
 
         validateDependencies(targets, errors);
-        validateArtifactNames(targets, msvc, errors);
+        validateArtifactNames(targets, effective, msvc, errors);
         return new TargetResolution(targets, errors, true);
     }
 
@@ -77,6 +77,8 @@ public final class TargetResolver {
     public static ManifestRootModel perTargetManifest(ManifestRootModel effective,
                                                       ResolvedTarget target) {
         ManifestRootModel out = new ManifestRootModel();
+        if (effective == null) effective = new ManifestRootModel();
+        dtm.builder.manifest.model.NativeOptions.merge(effective, target.options(), out);
         out.setId(effective.getId());
         out.setName(target.name());
         out.setVersion(effective.getVersion());
@@ -85,7 +87,8 @@ public final class TargetResolver {
         out.setCStandard(effective.getCStandard());
         out.setCxxStandard(effective.getCxxStandard());
         out.setToolchainVersion(effective.getToolchainVersion());
-        out.setPlatform(effective.getPlatform());
+        out.setPlatform(ManifestMerge.pick(effective.getPlatform(),
+                target.options() == null ? null : target.options().getPlatform()));
         out.setCCompiler(effective.getCCompiler());
         out.setCxxCompiler(effective.getCxxCompiler());
         out.setSysroot(effective.getSysroot());
@@ -149,23 +152,34 @@ public final class TargetResolver {
                 ResolvedTarget resolved = byId.get(dep);
                 if (resolved == null) {
                     errors.add("target '" + t.id() + "' depende de target inexistente: " + dep);
-                } else if (resolved.type() == TargetType.EXECUTABLE) {
-                    errors.add("target '" + t.id() + "' nao pode depender do executavel '"
-                            + dep + "' (dependencias devem ser shared ou static)");
                 }
             }
         }
     }
 
-    private static void validateArtifactNames(List<ResolvedTarget> targets, boolean msvc,
+    private static void validateArtifactNames(List<ResolvedTarget> targets, ManifestRootModel root, boolean msvc,
                                               List<String> errors) {
         Map<String, String> byFile = new LinkedHashMap<>();
+        java.util.Set<String> ids = new java.util.HashSet<>();
         for (ResolvedTarget t : targets) {
-            String file = Artifacts.fileName(t.name(), t.type(), msvc);
-            String other = byFile.putIfAbsent(file, t.id());
-            if (other != null) {
-                errors.add("targets '" + other + "' e '" + t.id()
-                        + "' geram o mesmo artefato: " + file);
+            java.util.List<Path> files;
+            try {
+                dtm.builder.build.NativeArtifacts.requireId(t.id());
+                String key = dtm.builder.build.ToolProbe.isWindows() ? t.id().toLowerCase(java.util.Locale.ROOT) : t.id();
+                if (!ids.add(key)) errors.add("Ids de targets colidem no diretorio de build: " + t.id());
+                files = dtm.builder.build.NativeArtifacts.declaredOutputs(Path.of("build"), root, t, msvc);
+            } catch (IllegalArgumentException e) {
+                errors.add(e.getMessage());
+                continue;
+            }
+            for (Path path : files) {
+                String file = path.toString();
+                if (dtm.builder.build.ToolProbe.isWindows()) file = file.toLowerCase(java.util.Locale.ROOT);
+                String other = byFile.putIfAbsent(file, t.id());
+                if (other != null && !other.equals(t.id())) {
+                    errors.add("targets '" + other + "' e '" + t.id()
+                            + "' geram o mesmo artefato: " + file);
+                }
             }
         }
     }

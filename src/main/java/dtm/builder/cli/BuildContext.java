@@ -176,6 +176,10 @@ public final class BuildContext {
     }
 
     public boolean runPhases(Set<Phase> phases) {
+        return runPhases(phases, onlyTargets);
+    }
+
+    public boolean runPhases(Set<Phase> phases, java.util.List<String> selectedTargets) {
         ManifestParseResult parse = readManifest();
         boolean hasManifest = manifestPath() != null;
         if (hasManifest) {
@@ -203,11 +207,21 @@ public final class BuildContext {
             LifecycleResult result = LifecycleResult.fail(
                     "Nenhum Manifest.json/Manifest.xml, CMakeLists.txt, meson.build ou Makefile "
                             + "encontrado em " + projectPath
-                            + ", e nenhuma fonte C/C++ foi localizada para build direto");
+                            + ", e nenhuma fonte C/C++/ASM foi localizada para build direto");
             printBuildSummary(result, (System.nanoTime() - startNanos) / 1_000_000L);
             return false;
         }
         Toolchain toolchain = ToolchainDetector.resolve(effective, compilerOverride);
+        try {
+            if (!selectedTargets.isEmpty() && buildSystem != BuildSystem.MANIFEST && buildSystem != BuildSystem.DEFAULT)
+                throw new IllegalArgumentException("--target requer build direto por manifest; backend " + buildSystem);
+            if (buildSystem == BuildSystem.MANIFEST || buildSystem == BuildSystem.DEFAULT)
+                dtm.builder.build.graph.TargetSelection.resolve(effective, projectPath,
+                        toolchain != null && toolchain.isMsvc(), selectedTargets);
+        } catch (IllegalArgumentException e) {
+            printBuildSummary(LifecycleResult.fail(e.getMessage()), (System.nanoTime() - startNanos) / 1_000_000L);
+            return false;
+        }
         Path packagesDir = configuration.packagesDir();
         Path buildDir = ProjectManifestFiles.resolveBuildDir(projectPath,
                 effective.getOutputDir());
@@ -228,7 +242,7 @@ public final class BuildContext {
         LifecycleContext ctx = new LifecycleContext(projectPath, effective, toolchain, buildSystem,
                 configuration.repository(), packagesDir, buildDir, buildMode, placeholders,
                 buildOutput(), line -> printer.println(Severity.INFO, "{}", line),
-                jobs, onlyTargets, incremental);
+                jobs, selectedTargets, incremental);
 
         LifecycleResult result = LifecycleExecutor.run(ctx, phases);
 

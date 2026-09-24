@@ -150,7 +150,7 @@ public final class ManifestParser {
             if (type != null && !type.isBlank() && !isKnownTargetType(type)) {
                 diagnostics.add(ManifestDiagnostic.error("manifest.target-type-unknown",
                         "target[" + idx + "] com 'type' desconhecido: " + type
-                                + " (use executable, shared ou static)"));
+                                + " (use executable, shared, static, object ou binary)"));
             }
             if (!isBlank(id)) {
                 for (String dep : target.getDependsOn()) {
@@ -168,7 +168,8 @@ public final class ManifestParser {
         String t = type.trim().toLowerCase();
         return ManifestTargetModel.TYPE_EXECUTABLE.equals(t)
                 || ManifestTargetModel.TYPE_SHARED.equals(t)
-                || ManifestTargetModel.TYPE_STATIC.equals(t);
+                || ManifestTargetModel.TYPE_STATIC.equals(t)
+                || "object".equals(t) || "binary".equals(t);
     }
 
     public static String writeString(ManifestRootModel model, boolean xml) throws IOException {

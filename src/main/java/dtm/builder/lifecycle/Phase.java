@@ -10,6 +10,7 @@ public enum Phase {
         if (s == null) {
             return null;
         }
+        if ("package".equalsIgnoreCase(s.trim())) return BUILD;
         for (Phase p : values()) {
             if (p.name().equalsIgnoreCase(s.trim())) {
                 return p;

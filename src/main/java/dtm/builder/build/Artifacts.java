@@ -27,6 +27,8 @@ public final class Artifacts {
 
     public static String fileName(String base, TargetType type, boolean msvc) {
         return switch (type) {
+            case OBJECT -> base + (msvc ? ".obj" : ".o");
+            case BINARY -> base + ".bin";
             case EXECUTABLE -> ToolProbe.isWindows() ? base + ".exe" : base;
             case SHARED -> {
                 if (ToolProbe.isWindows()) {

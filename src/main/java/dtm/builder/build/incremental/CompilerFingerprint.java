@@ -24,7 +24,7 @@ public final class CompilerFingerprint {
         return toolchain.kind() + "|" + describe(toolchain.cc()) + "|" + describe(toolchain.cxx());
     }
 
-    private static String describe(Path driver) {
+    public static String describe(Path driver) {
         if (driver == null) {
             return "-";
         }

@@ -15,7 +15,7 @@ import java.util.Map;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JacksonXmlRootElement(localName = "Manifest")
-public class ManifestRootModel {
+public class ManifestRootModel extends NativeOptions {
 
     private String id;
     private String name;

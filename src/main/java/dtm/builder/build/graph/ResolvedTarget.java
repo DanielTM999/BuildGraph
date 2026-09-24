@@ -21,7 +21,16 @@ public record ResolvedTarget(
         List<String> linkFlags,
         List<String> libraryPaths,
         List<String> dependsOn,
-        boolean synthetic) {
+        boolean synthetic,
+        dtm.builder.manifest.model.ManifestTargetModel options) {
+
+    public ResolvedTarget(String id, String name, TargetType type, List<String> sources,
+                          List<String> includes, List<String> defines, List<String> compileFlags,
+                          List<String> linkFlags, List<String> libraryPaths, List<String> dependsOn,
+                          boolean synthetic) {
+        this(id, name, type, sources, includes, defines, compileFlags, linkFlags, libraryPaths,
+                dependsOn, synthetic, null);
+    }
 
     public ResolvedTarget {
         sources = sources == null ? new ArrayList<>() : sources;

@@ -44,7 +44,7 @@ public final class TaskExecutor {
             Map<String, String> env = buildEnv(ctx.manifest(), task, resolver);
 
             ctx.output().accept("[task " + task.identity() + "] + " + String.join(" ", cmd));
-            int exit = ProcessRunner.run(cmd, workingDir, env, ctx.output());
+            int exit = ctx.executor().run(cmd, workingDir, env, ctx.output());
             if (exit != 0 && task.isFailOnError()) {
                 ctx.output().accept("Task '" + task.identity() + "' falhou (exit " + exit + ")");
                 return false;
@@ -63,7 +63,7 @@ public final class TaskExecutor {
             if (task == null || task.getPhase() == null) {
                 continue;
             }
-            if (!task.getPhase().trim().equalsIgnoreCase(phase.name())) {
+            if (Phase.fromString(task.getPhase()) != phase) {
                 continue;
             }
             String taskWhen = task.getWhen() == null || task.getWhen().isBlank()

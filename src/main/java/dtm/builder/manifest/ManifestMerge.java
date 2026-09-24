@@ -139,6 +139,8 @@ public final class ManifestMerge {
     public static ManifestTargetModel mergeTarget(ManifestTargetModel base,
                                                   ManifestTargetModel override) {
         ManifestTargetModel out = new ManifestTargetModel();
+        dtm.builder.manifest.model.NativeOptions.merge(base, override, out);
+        out.setPlatform(pick(base.getPlatform(), override.getPlatform()));
         out.setId(pick(base.getId(), override.getId()));
         out.setName(pick(base.getName(), override.getName()));
         out.setType(pick(base.getType(), override.getType()));

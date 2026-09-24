@@ -31,7 +31,7 @@ public final class UserArgs {
     public static final String INTERACTIVE = "interactive";
     public static final String NO_INCREMENTAL = "no_incremental";
 
-    private static final Set<String> RESERVED = Set.of(CLEAN, BUILD, INSTALL, TEST, REFRESH, LOCK);
+    private static final Set<String> RESERVED = Set.of(CLEAN, BUILD, "package", INSTALL, TEST, REFRESH, LOCK);
 
     private final Map<String, String> argsMap = new ConcurrentHashMap<>();
 
@@ -222,6 +222,7 @@ public final class UserArgs {
             String arg = args[i];
 
             switch (arg) {
+                case "package" -> argsMap.put(BUILD, "true");
                 case CLEAN, BUILD, INSTALL, TEST, REFRESH, LOCK -> argsMap.put(arg, "true");
                 case "--interactive", "-i" -> argsMap.put(INTERACTIVE, "true");
                 case "--no-incremental" -> argsMap.put(NO_INCREMENTAL, "true");
@@ -259,6 +260,10 @@ public final class UserArgs {
 
     private int appendValue(String[] args, int index, String key) {
         if (hasValue(args, index)) {
+            if (java.util.Arrays.stream(args[index + 1].split(",", -1)).allMatch(String::isBlank)) {
+                invalid("--target requer o id de um target");
+                return index + 1;
+            }
             String current = argsMap.getOrDefault(key, "");
             argsMap.put(key, current.isBlank() ? args[index + 1]
                     : current + "," + args[index + 1]);

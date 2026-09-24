@@ -98,7 +98,24 @@ public final class InteractiveSession {
 
     private boolean runPhaseLine(String command, String lower) {
         EnumSet<Phase> phases = EnumSet.noneOf(Phase.class);
-        for (String token : lower.split("\\s+")) {
+        java.util.List<String> targets = new java.util.ArrayList<>();
+        String[] tokens = command.split("\\s+");
+        boolean targetOverride = false;
+        for (int i = 0; i < tokens.length; i++) {
+            String token = tokens[i];
+            if (token.equals("--target") || token.equals("-t") || token.equals("--targets")) {
+                if (++i >= tokens.length || tokens[i].startsWith("-")) {
+                    printer.println(Severity.WARNING, "--target requer um id");
+                    return true;
+                }
+                targetOverride = true;
+                for (String id : tokens[i].split(",")) if (!id.isBlank()) targets.add(id.trim());
+                if (targets.isEmpty()) {
+                    printer.println(Severity.WARNING, "--target requer um id");
+                    return true;
+                }
+                continue;
+            }
             if (token.isEmpty()) {
                 continue;
             }
@@ -112,7 +129,8 @@ public final class InteractiveSession {
         if (!phases.isEmpty()) {
             // A ordem de execucao segue o lifecycle (clean -> build -> test -> install),
             // independente da ordem digitada.
-            context.runPhases(phases);
+            if (targetOverride) context.runPhases(phases, targets);
+            else context.runPhases(phases);
         }
         return true;
     }
@@ -134,10 +152,11 @@ public final class InteractiveSession {
 
     private void printBanner() {
         printer.println(Severity.INFO,
-                "Modo interativo. Fases (combinaveis, ordenadas pelo lifecycle): clean, build, "
+                "Modo interativo. Fases (combinaveis, ordenadas pelo lifecycle): clean, build/package, "
                         + "test, install. Ex: 'install build clean' roda clean -> build -> install.");
         printer.println(Severity.INFO,
                 "Outros comandos: lock, refresh, reload, status, compile-commands, help, quit");
+        printer.println(Severity.INFO, "Selecao por comando: package --target app (inclui dependencias)");
         printer.println(Severity.INFO,
                 "Build direto e incremental por padrao; --no-incremental deve ser informado "
                         + "ao iniciar a sessao.");

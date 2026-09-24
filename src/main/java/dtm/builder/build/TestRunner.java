@@ -1,14 +1,9 @@
 package dtm.builder.build;
 
 import dtm.builder.build.graph.ResolvedTarget;
-import dtm.builder.build.graph.TargetResolution;
-import dtm.builder.build.graph.TargetResolver;
-import dtm.builder.manifest.ManifestMerge;
 import dtm.builder.manifest.model.ManifestRootModel;
 import dtm.builder.repo.PathSanitizer;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -51,125 +46,54 @@ public final class TestRunner {
     }
 
     private static BuildResult directTests(BuildRequest req) {
-        Path projectPath = req.projectPath();
-        ManifestRootModel manifest = req.manifest();
-
-        List<Path> testSources = SourceCollector.collectTestSources(projectPath, manifest);
-        if (testSources.isEmpty()) {
-            return BuildResult.ok(0, null, "Nenhum teste encontrado");
-        }
-        TestMainResolver.Result testMain = TestMainResolver.resolve(
-                projectPath, manifest, testSources);
-        if (!testMain.success()) {
-            return BuildResult.fail(1, testMain.error());
-        }
-        if (req.toolchain() == null) {
-            return BuildResult.fail(1, "Nenhuma toolchain C/C++ encontrada");
-        }
-
-        boolean msvc = req.toolchain().isMsvc();
-        TargetResolution resolution = TargetResolver.resolve(manifest, projectPath, msvc);
-        boolean multiTarget = resolution.multiTarget();
-
-        // No modo multi-target os testes compilam junto apenas as fontes
-        // compartilhadas da raiz e linkam contra os artefatos das libs.
-        List<Path> sources = new ArrayList<>(testSources);
-        List<Path> projectSources = multiTarget
-                ? SourceCollector.collectSources(projectPath,
-                        manifest == null ? List.of() : manifest.getSources(), false)
-                : SourceCollector.collectSources(projectPath, manifest);
-        for (Path src : projectSources) {
-            String name = src.getFileName().toString().toLowerCase();
-            if (!name.startsWith("main.")) {
-                sources.add(src);
-            }
-        }
-
-        boolean cpp = SourceCollector.isCppSources(sources);
-        Path buildDir = req.buildDir();
+        ManifestRootModel manifest = req.manifest() == null ? new ManifestRootModel() : req.manifest();
+        List<Path> testSources = SourceCollector.collectTestSources(req.projectPath(), manifest);
+        if (testSources.isEmpty()) return BuildResult.ok(0, null, "Nenhum teste encontrado");
+        TestMainResolver.Result main = TestMainResolver.resolve(req.projectPath(), manifest, testSources);
+        if (!main.success()) return BuildResult.fail(1, main.error());
+        boolean msvc = req.toolchain() != null && req.toolchain().isMsvc();
+        dtm.builder.build.graph.TargetGraph selected;
         try {
-            Files.createDirectories(buildDir);
-        } catch (IOException e) {
-            return BuildResult.fail(1, "Falha ao criar diretorio de build: " + e.getMessage());
+            selected = dtm.builder.build.graph.TargetSelection.resolve(manifest, req.projectPath(), msvc, req.onlyTargets());
+        } catch (IllegalArgumentException e) {
+            return BuildResult.fail(1, e.getMessage());
         }
-
-        String base = PathSanitizer.sanitizePackageFolderName(
-                Artifacts.baseName(projectPath, manifest)) + "_tests";
-        Path artifact = buildDir.resolve(ToolProbe.isWindows() ? base + ".exe" : base);
-
-        PackagePaths pkgPaths = PackagePaths.resolve(req.packagesDir());
-        List<Path> extraLibDirs = new ArrayList<>(pkgPaths.libraryDirs());
-        List<String> extraLinkLibs = new ArrayList<>(pkgPaths.linkLibraries());
-        ManifestRootModel testManifest = manifest;
-
-        if (multiTarget && manifest != null) {
-            testManifest = copyForTests(manifest);
-            for (ResolvedTarget target : resolution.targets()) {
-                if (!target.type().isLibrary()) {
-                    continue;
-                }
-                testManifest.setIncludes(ManifestMerge.mergeAdditive(
-                        testManifest.getIncludes(), target.includes(), null));
-                Path libArtifact = Artifacts.artifactPath(buildDir, target.name(),
-                        target.type(), msvc);
-                if (target.type() == TargetType.SHARED && !msvc) {
-                    if (!extraLibDirs.contains(buildDir)) {
-                        extraLibDirs.add(buildDir);
-                    }
-                    extraLinkLibs.add(target.name());
-                } else if (target.type() == TargetType.STATIC && !msvc) {
-                    List<String> linkFlags = new ArrayList<>(testManifest.getLinkFlags());
-                    linkFlags.add(libArtifact.toString());
-                    testManifest.setLinkFlags(linkFlags);
-                } else {
-                    sources.add(msvc && target.type() == TargetType.SHARED
-                            ? buildDir.resolve(target.name() + ".lib") : libArtifact);
-                }
-            }
+        List<Path> sources = new ArrayList<>(testSources);
+        boolean multi = !manifest.getTargets().isEmpty();
+        for (Path source : SourceCollector.collectSources(req.projectPath(), manifest.getSources(), !multi))
+            if (!source.getFileName().toString().toLowerCase().startsWith("main.")) sources.add(source);
+        String base = PathSanitizer.sanitizePackageFolderName(Artifacts.baseName(req.projectPath(), manifest)) + "_tests";
+        List<ResolvedTarget> allTargets = dtm.builder.build.graph.TargetResolver.resolve(manifest, req.projectPath(), msvc).targets();
+        java.util.Set<String> ids = new java.util.HashSet<>();
+        java.util.Set<Path> outputs = new java.util.HashSet<>();
+        for (ResolvedTarget existing : allTargets) {
+            ids.add(existing.id());
+            for (Path path : NativeArtifacts.declaredOutputs(req.buildDir(), manifest, existing, msvc)) outputs.add(path.toAbsolutePath().normalize());
         }
-
-        CompileSpec spec = new CompileSpec(
-                req.toolchain(), cpp, testManifest, false, sources, artifact,
-                pkgPaths.includeDirs(), extraLibDirs, extraLinkLibs,
-                req.buildMode(), new ArrayList<>(), projectPath);
-
-        List<String> compile = CompileCommandBuilder.buildCompileCommand(spec);
-        req.output().accept("+ " + String.join(" ", compile));
-        int compiled = ProcessRunner.run(compile, projectPath,
-                manifest == null ? null : manifest.getEnv(), req.output());
-        if (compiled != 0) {
-            return BuildResult.fail(compiled, "Compilacao dos testes falhou (exit " + compiled + ")");
-        }
-
+        TargetPlatform testPlatform = TargetPlatform.resolve(manifest.getPlatform(), null);
+        while (ids.contains(base) || outputs.contains(req.buildDir().resolve(testPlatform.fileName(base, TargetType.EXECUTABLE, msvc)).toAbsolutePath().normalize()))
+            base += "_";
+        String id = base;
+        var options = new dtm.builder.manifest.model.ManifestTargetModel();
+        options.setOutputName(TargetPlatform.resolve(manifest.getPlatform(), null).fileName(base, TargetType.EXECUTABLE, msvc));
+        options.setAsmFormat("auto");
+        List<String> dependencies = multi ? selected.targets().stream()
+                .filter(t -> t.type().isLibrary() || t.type() == TargetType.OBJECT).map(ResolvedTarget::id).toList() : List.of();
+        var suite = new ResolvedTarget(id, base, TargetType.EXECUTABLE,
+                sources.stream().distinct().map(Path::toString).toList(), manifest.getIncludes(), manifest.getDefines(),
+                manifest.getCompileFlags(), manifest.getLinkFlags(), manifest.getLibraryPaths(), dependencies, false, options);
+        List<ResolvedTarget> targets = new ArrayList<>(selected.targets());
+        targets.add(suite);
+        var graph = dtm.builder.build.graph.TargetGraph.of(targets);
+        BuildResult compiled = NativeTargetBuilder.build(req, suite, graph, req.output());
+        if (!compiled.success()) return compiled;
+        TargetPlatform platform = TargetPlatform.resolve(manifest.getPlatform(), null);
+        if (!platform.nativeDestination()) return BuildResult.fail(1, "Testes gerados para " + platform.triple()
+                + "; execucao cruzada requer um runner externo");
+        Path artifact = NativeArtifacts.artifact(req.buildDir(), manifest, suite, msvc);
         req.output().accept("+ " + artifact);
-        int ran = ProcessRunner.run(List.of(artifact.toString()), projectPath,
-                manifest == null ? null : manifest.getEnv(), req.output());
-        return ran == 0 ? BuildResult.ok(ran, artifact, "Testes OK")
-                : BuildResult.fail(ran, "Testes falharam (exit " + ran + ")");
+        int exit = req.executor().run(List.of(artifact.toString()), req.projectPath(), manifest.getEnv(), req.output());
+        return exit == 0 ? BuildResult.ok(0, artifact, "Testes OK") : BuildResult.fail(exit, "Testes falharam");
     }
 
-    private static ManifestRootModel copyForTests(ManifestRootModel manifest) {
-        ManifestRootModel out = new ManifestRootModel();
-        out.setId(manifest.getId());
-        out.setName(manifest.getName());
-        out.setVersion(manifest.getVersion());
-        out.setCompilerVersion(manifest.getCompilerVersion());
-        out.setCStandard(manifest.getCStandard());
-        out.setCxxStandard(manifest.getCxxStandard());
-        out.setPlatform(manifest.getPlatform());
-        out.setCCompiler(manifest.getCCompiler());
-        out.setCxxCompiler(manifest.getCxxCompiler());
-        out.setSysroot(manifest.getSysroot());
-        out.setTestFolder(manifest.getTestFolder());
-        out.setTestMain(manifest.getTestMain());
-        out.setSources(new ArrayList<>(manifest.getSources()));
-        out.setIncludes(new ArrayList<>(manifest.getIncludes()));
-        out.setDefines(new ArrayList<>(manifest.getDefines()));
-        out.setCompileFlags(new ArrayList<>(manifest.getCompileFlags()));
-        out.setLinkFlags(new ArrayList<>(manifest.getLinkFlags()));
-        out.setLibraryPaths(new ArrayList<>(manifest.getLibraryPaths()));
-        out.setEnv(manifest.getEnv());
-        out.setProperties(manifest.getProperties());
-        return out;
-    }
 }

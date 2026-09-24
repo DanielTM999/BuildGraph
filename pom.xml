@@ -8,7 +8,7 @@
     <artifactId>BuildGraph</artifactId>
     <version>${revision}</version>
     <name>BuildGraph</name>
-    <description>Build system for C and C++ projects</description>
+    <description>Build system for C, C++ and assembly projects</description>
 
     <licenses>
         <license>

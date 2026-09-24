@@ -179,6 +179,15 @@ public final class PlaceholderResolver {
             case "sysroot" -> profile.getSysroot();
             case "cCompiler" -> profile.getCCompiler();
             case "cxxCompiler" -> profile.getCxxCompiler();
+            case "asmCompiler" -> profile.getAsmCompiler();
+            case "asmKind" -> profile.getAsmKind();
+            case "linker" -> profile.getLinker();
+            case "linkerKind" -> profile.getLinkerKind();
+            case "archiver" -> profile.getArchiver();
+            case "objcopy" -> profile.getObjcopy();
+            case "asmFormat" -> profile.getAsmFormat();
+            case "outputName" -> profile.getOutputName();
+            case "linkMode" -> profile.getLinkMode();
             case "outputDir" -> profile.getOutputDir();
             case "packagesBase" -> profile.getPackagesBase();
             case "library" -> profile.getLibrary() == null ? null : String.valueOf(profile.getLibrary());

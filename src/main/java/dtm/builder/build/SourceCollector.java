@@ -16,7 +16,7 @@ public final class SourceCollector {
 
     private static final Set<String> SOURCE_EXTS = Set.of(
             ".c", ".cpp", ".cc", ".cxx", ".c++", ".cppm", ".ixx", ".mpp", ".ccm", ".cxxm",
-            ".m", ".mm");
+            ".m", ".mm", ".asm", ".s");
 
     private static final Set<String> CPP_EXTS = Set.of(
             ".cpp", ".cc", ".cxx", ".c++", ".cppm", ".ixx", ".mpp", ".ccm", ".cxxm", ".mm");
@@ -52,7 +52,7 @@ public final class SourceCollector {
                 out.add(entry);
             }
         }
-        return out;
+        return out.stream().distinct().sorted().toList();
     }
 
     public static List<Path> collectTestSources(Path projectPath, ManifestRootModel manifest) {
@@ -73,6 +73,15 @@ public final class SourceCollector {
             }
         }
         return false;
+    }
+
+    public static boolean isAssembly(Path source) {
+        String ext = extensionOf(source);
+        return ext.equals(".asm") || ext.equals(".s");
+    }
+
+    public static boolean needsPreprocessor(Path source) {
+        return source.getFileName().toString().endsWith(".S");
     }
 
     private static void collect(Path dir, List<Path> out) {

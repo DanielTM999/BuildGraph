@@ -128,7 +128,7 @@ class TargetResolverTest {
     }
 
     @Test
-    void reportsDependencyOnExecutable() {
+    void allowsExecutableAsOrderOnlyDependency() {
         TargetResolution r = TargetResolver.resolve(manifest("""
                 { "id": "x", "version": "1", "sources": ["src"],
                   "targets": [
@@ -136,8 +136,9 @@ class TargetResolverTest {
                     { "id": "app", "dependsOn": ["tool"] }
                   ] }
                 """), PROJECT, false);
-        assertFalse(r.isOk());
-        assertTrue(r.errors().get(0).contains("executavel"));
+        assertTrue(r.isOk());
+        assertTrue(dtm.builder.build.NativeTargetBuilder.linkDependencies(
+                TargetGraph.of(r.targets()), r.targets().get(1)).isEmpty());
     }
 
     @Test

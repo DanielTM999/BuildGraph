@@ -27,9 +27,14 @@ public final class IncrementalBuildService {
 
     public IncrementalBuildService(Path buildDir, Toolchain toolchain, String buildMode,
                                    boolean enabled) {
+        this(buildDir, toolchain, buildMode, enabled, "");
+    }
+
+    public IncrementalBuildService(Path buildDir, Toolchain toolchain, String buildMode,
+                                   boolean enabled, String nativeFingerprint) {
         this.buildDir = buildDir;
         this.enabled = enabled;
-        this.fingerprint = CompilerFingerprint.of(toolchain);
+        this.fingerprint = CompilerFingerprint.of(toolchain) + nativeFingerprint;
         this.buildMode = buildMode == null ? "" : buildMode;
     }
 

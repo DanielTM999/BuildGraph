@@ -16,7 +16,11 @@ public final class CompileCommandBuilder {
     }
 
     public static List<String> buildLinkCommand(CompileSpec spec) {
-        return buildCommand(spec, false);
+        return LinkCommandBuilder.build(spec.toolchain().driver(spec.cpp()),
+                spec.toolchain().isMsvc() ? "msvc" : "gnu", true, spec.cpp(),
+                TargetPlatform.resolve(spec.manifest().getPlatform(), null), spec.manifest(),
+                spec.projectPath(), spec.library(), spec.sources(), spec.artifact(),
+                spec.extraLibDirs(), spec.extraLinkLibs());
     }
 
     public static List<String> buildCompileOnlyCommand(CompileSpec spec) {
@@ -52,6 +56,10 @@ public final class CompileCommandBuilder {
         if (clang && notBlank(manifest.getPlatform())) {
             cmd.add("--target=" + manifest.getPlatform().trim());
         }
+        if (!clang && notBlank(manifest.getPlatform())) {
+            TargetPlatform platform = TargetPlatform.resolve(manifest.getPlatform(), null);
+            if (platform.x86()) cmd.add(platform.bits64() ? "-m64" : "-m32");
+        }
         if (notBlank(manifest.getSysroot())) {
             cmd.add("--sysroot=" + manifest.getSysroot().trim());
         }
@@ -68,7 +76,7 @@ public final class CompileCommandBuilder {
             cmd.add("-shared");
         }
         if (spec.library()) {
-            if (!ToolProbe.isWindows()) {
+            if (!TargetPlatform.resolve(manifest.getPlatform(), null).windows()) {
                 cmd.add("-fPIC");
             }
         }
@@ -154,6 +162,7 @@ public final class CompileCommandBuilder {
         }
         if (compileOnly) {
             cmd.add("/c");
+            cmd.add("/Fd:" + spec.artifact().resolveSibling(spec.artifact().getFileName() + ".pdb"));
             if (spec.depFile() != null) {
                 cmd.add("/showIncludes");
             }

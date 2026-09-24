@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class ManifestProfileModel {
+public class ManifestProfileModel extends NativeOptions {
 
     private String buildType;
     private String platform;

@@ -125,7 +125,7 @@ public final class CommandDispatcher {
     }
 
     private void printHelp() {
-        printer.println(Severity.NONE, "BuildGraph - mini build system para C/C++");
+        printer.println(Severity.NONE, "BuildGraph - mini build system para C/C++/ASM");
         printer.println(Severity.NONE, "");
         printer.println(Severity.NONE,
                 "Uso: buildgraph [projectPath] [clean] [build] [install] [test] [refresh] [lock]");
@@ -139,7 +139,7 @@ public final class CommandDispatcher {
                 "                [--no-incremental]");
         printer.println(Severity.NONE, "");
         printer.println(Severity.NONE, "  projectPath   diretorio do projeto (default: diretorio atual)");
-        printer.println(Severity.NONE, "  clean/build/install/test  fases do lifecycle (default: build)");
+        printer.println(Severity.NONE, "  clean/build/package/install/test  fases do lifecycle (default: build; package = build)");
         printer.println(Severity.NONE,
                 "  refresh       resolve, atualiza lock e materializa dependencias");
         printer.println(Severity.NONE,
@@ -152,7 +152,7 @@ public final class CommandDispatcher {
         printer.println(Severity.NONE, "  --repo/--external  repo adicional; default final: ~/.buildgraph/repository");
         printer.println(Severity.NONE, "  --packages/--out   pasta local (fallback de packagesBase)");
         printer.println(Severity.NONE, "  --compile-commands/--clangd  imprime compile_commands.json no stdout");
-        printer.println(Severity.NONE, "  -t, --target  builda apenas o target indicado (e suas dependencias);");
+        printer.println(Severity.NONE, "  -t, --target  limita o lifecycle ao target indicado e suas dependencias;");
         printer.println(Severity.NONE, "                repetivel ou separado por virgula");
         printer.println(Severity.NONE, "  -j, --jobs    limita o paralelismo entre targets (1 = serial)");
         printer.println(Severity.NONE,

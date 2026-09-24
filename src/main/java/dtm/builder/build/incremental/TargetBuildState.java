@@ -8,7 +8,7 @@ import java.util.Map;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TargetBuildState {
 
-    public static final int SCHEMA_VERSION = 2;
+    public static final int SCHEMA_VERSION = 3;
 
     private int schemaVersion = SCHEMA_VERSION;
     private String toolchainFingerprint = "";

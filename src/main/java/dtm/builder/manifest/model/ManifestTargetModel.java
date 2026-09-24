@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class ManifestTargetModel {
+public class ManifestTargetModel extends NativeOptions {
 
     public static final String TYPE_EXECUTABLE = "executable";
     public static final String TYPE_SHARED = "shared";
@@ -19,6 +19,9 @@ public class ManifestTargetModel {
     private String id;
     private String name;
     private String type;
+    private String platform;
+    public String getPlatform() { return platform; }
+    public void setPlatform(String value) { platform = value; }
 
     @JsonSetter(nulls = Nulls.SKIP)
     @JacksonXmlElementWrapper(localName = "sources")

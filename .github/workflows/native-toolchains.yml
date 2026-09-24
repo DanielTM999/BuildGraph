@@ -1,0 +1,50 @@
+name: Native toolchain integration
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: Install assemblers and LLVM tools
+        run: sudo apt-get update && sudo apt-get install -y nasm binutils clang lld llvm binutils-riscv64-linux-gnu
+      - name: C, C++, NASM, GNU and mixed targets
+        run: mvn --batch-mode --no-transfer-progress verify -Pnative-it-gcc
+      - name: RISC-V cross assembly
+        run: mvn --batch-mode --no-transfer-progress -DskipNativeITs=false -Dit.test=AssemblyToolchainNativeIT#gnuAssemblerSupportsConfiguredCrossArchitecture -Dbuildgraph.it.gas=riscv64-linux-gnu-as -Dbuildgraph.it.gasPlatform=riscv64-linux-gnu verify
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: Install NASM
+        run: choco install nasm --no-progress -y
+      - name: MSVC, MASM and NASM
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { throw 'Visual C++ tools were not found' }
+          $devcmd = Join-Path $vs 'Common7\Tools\VsDevCmd.bat'
+          $nasm = Join-Path $env:ProgramFiles 'NASM\nasm.exe'
+          $command = 'call "' + $devcmd + '" -arch=x64 -host_arch=x64 && mvn --batch-mode --no-transfer-progress verify -Pnative-it-msvc "-Dbuildgraph.it.nasm=' + $nasm + '"'
+          & cmd.exe /d /s /c $command
+          exit $LASTEXITCODE

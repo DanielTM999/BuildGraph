@@ -38,6 +38,7 @@ public final class CompilationDatabaseGenerator {
         for (ResolvedTarget target : resolution.targets()) {
             for (Path source : SourceCollector.collectSources(projectPath,
                     target.sources(), target.synthetic())) {
+                if (SourceCollector.isAssembly(source)) continue;
                 sourcesByTarget.putIfAbsent(source.toAbsolutePath().normalize(), target);
             }
         }
@@ -65,6 +66,8 @@ public final class CompilationDatabaseGenerator {
                             targetManifest.getIncludes(), dep.includes(), null));
                 }
             }
+            if (targetManifest != null && dtm.builder.build.NativeTools.specified(targetManifest.getPlatform()))
+                targetManifest.setPlatform(dtm.builder.build.TargetPlatform.resolve(targetManifest.getPlatform(), null).triple());
             boolean cpp = SourceCollector.isCppSources(List.of(source));
             String extension = toolchain.isMsvc() ? ".obj" : ".o";
             String base = sanitize(source.getFileName().toString());
