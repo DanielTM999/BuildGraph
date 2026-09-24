@@ -36,7 +36,6 @@ public final class AssemblyCommandBuilder {
                 cmd.addAll(List.of("-f", format));
                 for (Path inc : includes) cmd.add("-I" + inc + java.io.File.separator);
                 for (String define : m.getDefines()) cmd.add("-D" + stripDefine(define));
-                if (dependencies != null) cmd.addAll(List.of("-MD", dependencies.toString()));
             }
             case "gas" -> {
                 if (platform.x86() && !platform.windows()) cmd.add(platform.bits64() ? "--64" : "--32");
@@ -60,6 +59,15 @@ public final class AssemblyCommandBuilder {
         cmd.addAll(m.getAsmFlags());
         if (tool.kind().equals("masm")) cmd.addAll(List.of("/Fo" + output, "/c", source.toString()));
         else cmd.addAll(List.of("-o", output.toString(), source.toString()));
+        return cmd;
+    }
+
+    public static List<String> nasmDependencies(NativeTools.Tool tool, TargetPlatform platform, ManifestRootModel m,
+                                                Path project, Path source, Path output, Path dependencies,
+                                                List<Path> extraIncludes) {
+        List<String> cmd = build(tool, platform, m, project, source, output, null, extraIncludes);
+        cmd.subList(cmd.size() - 3, cmd.size()).clear();
+        cmd.addAll(List.of("-M", "-MF", dependencies.toString(), "-MQ", output.toString(), source.toString()));
         return cmd;
     }
 

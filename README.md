@@ -115,7 +115,8 @@ executados em paralelo.
 Builds diretos por manifest ou descoberta automática são incrementais por padrão. O estado fica em
 `<outputDir>/.buildgraph-state`: cada objeto é invalidado quando mudam o conteúdo da fonte ou de
 um header, o comando de compilação, o modo de build ou a toolchain. GCC/Clang geram dependências
-com `-MMD -MF`; MSVC usa `/showIncludes`. O link/archive só é repetido quando os objetos, uma
+com `-MMD -MF`; MSVC usa `/showIncludes`; NASM roda uma passada `-M -MF` separada, porque o
+`-MD` do NASM 2.16 omite arquivos de `%include`. O link/archive só é repetido quando os objetos, uma
 biblioteca dependente ou o comando de link mudam. `clean` remove também esse estado.
 
 ```shell

@@ -133,6 +133,7 @@ public final class NativeTargetBuilder {
                 Path depFile = objDir.resolve(object.getFileName() + ".d");
                 Path ppDep = objDir.resolve(object.getFileName() + ".cpp.d");
                 List<String> preprocess = List.of();
+                List<String> dependencyScan = List.of();
                 List<String> command;
                 NativeTools.Tool asm = assemblers.get(source);
                 if (asm != null) {
@@ -142,6 +143,8 @@ public final class NativeTargetBuilder {
                         preprocess = AssemblyCommandBuilder.preprocess(compiler, m, req.projectPath(), source, asmSource, ppDep, packages.includeDirs());
                     }
                     command = AssemblyCommandBuilder.build(asm, platform, m, req.projectPath(), asmSource, object, depFile, packages.includeDirs(), !preprocess.isEmpty());
+                    if (asm.kind().equals("nasm"))
+                        dependencyScan = AssemblyCommandBuilder.nasmDependencies(asm, platform, m, req.projectPath(), asmSource, object, depFile, packages.includeDirs());
                 } else {
                     CompileSpec spec = new CompileSpec(compiler, SourceCollector.isCppSources(List.of(source)), m,
                             target.type() == TargetType.SHARED, List.of(source), object, packages.includeDirs(),
@@ -150,6 +153,7 @@ public final class NativeTargetBuilder {
                 }
                 List<String> signature = new ArrayList<>(preprocess);
                 signature.addAll(command);
+                signature.addAll(dependencyScan);
                 if (incremental.isObjectUpToDate(state, source, object, signature)) {
                     progress.accept("Sem mudancas: " + source.getFileName(), 0L);
                     continue;
@@ -173,6 +177,7 @@ public final class NativeTargetBuilder {
                     try { ObjectFormatValidator.validate(object, platform); }
                     catch (IOException e) { Files.deleteIfExists(object); throw e; }
                 }
+                if (!dependencyScan.isEmpty() && run(req, m, dependencyScan, out) != 0) Files.deleteIfExists(depFile);
                 List<Path> deps = includes != null ? includes.prefix() == null ? null : includes.includes()
                         : asm != null && asm.kind().equals("masm") ? null : DepFileParser.parseSafe(depFile, req.projectPath());
                 if (!preprocess.isEmpty() && deps != null) {

@@ -34,9 +34,10 @@ class NativeBuildTest {
                     Files.createDirectories(output.getParent());
                     Files.writeString(output, "artifact-" + commands.size());
                 }
+                Path depTarget = cmd.contains("-MQ") ? Path.of(cmd.get(cmd.indexOf("-MQ") + 1)) : output;
                 for (String flag : List.of("-MF", "-MD", "--MD")) if (cmd.contains(flag)) {
                     Path dep = Path.of(cmd.get(cmd.indexOf(flag) + 1));
-                    StringBuilder body = new StringBuilder(escape(output) + ":");
+                    StringBuilder body = new StringBuilder(escape(depTarget) + ":");
                     for (String arg : cmd) {
                         if (arg.matches(".*\\.(c|cpp|asm|s|S)$") && Files.exists(Path.of(arg))) body.append(' ').append(escape(Path.of(arg)));
                     }
@@ -101,7 +102,7 @@ class NativeBuildTest {
         m.setTargets(List.of(asm, core, app, other)); FakeTools tools = new FakeTools();
         BuildResult result = BuildExecutor.build(request(m, tools, "app"));
         assertTrue(result.success(), result.message());
-        assertEquals(5, tools.commands.size());
+        assertEquals(6, tools.commands.size());
         assertTrue(tools.commands.getLast().getFirst().endsWith("fake-g++"));
         assertTrue(tools.commands.getLast().stream().anyMatch(a -> a.endsWith("libcore.a")));
         assertFalse(tools.commands.getLast().stream().anyMatch(a -> a.endsWith("asm.o")));
@@ -115,24 +116,24 @@ class NativeBuildTest {
         Files.writeString(project.resolve("layout.ld"), "script1");
         app.setLinkDependencies(List.of("layout.ld"));
         FakeTools tools = new FakeTools(); var req = request(m, tools);
-        assertTrue(BuildExecutor.build(req).success()); assertEquals(2, tools.commands.size());
-        assertTrue(BuildExecutor.build(req).success()); assertEquals(2, tools.commands.size());
+        assertTrue(BuildExecutor.build(req).success()); assertEquals(3, tools.commands.size());
+        assertTrue(BuildExecutor.build(req).success()); assertEquals(3, tools.commands.size());
         Files.writeString(project.resolve("include.inc"), "v2 changed");
-        assertTrue(BuildExecutor.build(req).success()); assertEquals(4, tools.commands.size());
+        assertTrue(BuildExecutor.build(req).success()); assertEquals(6, tools.commands.size());
         Files.writeString(project.resolve("layout.ld"), "script2 changed");
-        assertTrue(BuildExecutor.build(req).success()); assertEquals(5, tools.commands.size());
-        app.setAsmFlags(List.of("-DCHANGED"));
         assertTrue(BuildExecutor.build(req).success()); assertEquals(7, tools.commands.size());
+        app.setAsmFlags(List.of("-DCHANGED"));
+        assertTrue(BuildExecutor.build(req).success()); assertEquals(10, tools.commands.size());
     }
 
     @Test void rawNasmNeedsNoCompilerAndConvertedBinaryUsesObjcopy() throws Exception {
         ManifestRootModel m = manifest(); m.setCCompiler(null); m.setCxxCompiler(null);
         var boot = target("boot", "binary", "boot.asm"); boot.setAsmFormat("bin"); boot.setOutputName("boot/sector.bin");
         m.setTargets(List.of(boot)); FakeTools tools = new FakeTools();
-        assertTrue(BuildExecutor.build(request(m, tools)).success()); assertEquals(1, tools.commands.size());
+        assertTrue(BuildExecutor.build(request(m, tools)).success()); assertEquals(2, tools.commands.size());
         assertTrue(Files.exists(project.resolve("build/boot/sector.bin")));
         boot.setAsmFormat("auto");
-        assertTrue(BuildExecutor.build(request(m, tools)).success()); assertEquals(4, tools.commands.size());
+        assertTrue(BuildExecutor.build(request(m, tools)).success()); assertEquals(6, tools.commands.size());
         assertTrue(tools.commands.getLast().contains("binary"));
     }
 
@@ -259,8 +260,8 @@ class NativeBuildTest {
         var m = manifest(); m.setTargets(List.of(target("part__one", "object", "first.asm"),
                 target("part_one", "object", "second.asm")));
         var tools = new FakeTools(); var req = request(m, tools);
-        assertTrue(BuildExecutor.build(req).success()); assertEquals(2, tools.commands.size());
-        assertTrue(BuildExecutor.build(req).success()); assertEquals(2, tools.commands.size());
+        assertTrue(BuildExecutor.build(req).success()); assertEquals(4, tools.commands.size());
+        assertTrue(BuildExecutor.build(req).success()); assertEquals(4, tools.commands.size());
         assertTrue(Files.exists(project.resolve("build/.buildgraph-state/part__one.json")));
         assertTrue(Files.exists(project.resolve("build/.buildgraph-state/part_one.json")));
     }
