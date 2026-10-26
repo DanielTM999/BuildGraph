@@ -932,6 +932,11 @@ sem retornar silenciosamente ao host. NASM e MASM continuam limitados às arquit
 dessas ferramentas. Para cross-compilation, configure os executáveis cruzados ou disponibilize
 os nomes `<triple>-as`, `<triple>-ld`, `<triple>-ar` e `<triple>-objcopy` no PATH.
 
+A forma curta `windows-<arquitetura>` segue a ABI nativa da toolchain escolhida. MSVC e clang usam a
+ABI MSVC (`<arquitetura>-pc-windows-msvc`). GCC/MinGW usa a ABI GNU (`<arquitetura>-w64-mingw32`):
+bibliotecas estáticas saem como `lib<nome>.a` e o linker padrão é GNU. Triples explícitos não são
+alterados.
+
 Includes ASM são rastreados por depfiles NASM/GNU. MASM remonta conservadoramente quando não há
 dependências confiáveis. O cache também considera ferramentas, formato e plataforma; caches de
 versões anteriores são reconstruídos. `compile_commands.json` continua dedicado às fontes C/C++.

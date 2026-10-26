@@ -4,6 +4,7 @@ import dtm.builder.build.BuildDiagnosticParser;
 import dtm.builder.build.BuildSystem;
 import dtm.builder.build.BuildSystemDetector;
 import dtm.builder.build.SourceCollector;
+import dtm.builder.build.TargetPlatform;
 import dtm.builder.build.Toolchain;
 import dtm.builder.build.ToolchainDetector;
 import dtm.builder.integration.CompilationDatabaseGenerator;
@@ -14,6 +15,7 @@ import dtm.builder.manifest.model.ManifestDiagnostic;
 import dtm.builder.manifest.model.ManifestParseResult;
 import dtm.builder.manifest.model.ManifestProfileModel;
 import dtm.builder.manifest.model.ManifestRootModel;
+import dtm.builder.manifest.model.ManifestTargetModel;
 import dtm.builder.lifecycle.LifecycleContext;
 import dtm.builder.lifecycle.LifecycleExecutor;
 import dtm.builder.lifecycle.LifecycleResult;
@@ -150,7 +152,7 @@ public final class BuildContext {
         ManifestProfileModel activeProfile = ManifestProfiles.activeProfile(raw);
         String buildMode = activeProfile != null && notBlank(activeProfile.getBuildType())
                 ? activeProfile.getBuildType() : "Debug";
-        Toolchain toolchain = ToolchainDetector.resolve(effective, compilerOverride);
+        Toolchain toolchain = resolveToolchain(effective);
         return CompilationDatabaseGenerator.generate(projectPath, effective, toolchain,
                 configuration.packagesDir(), buildDir, buildMode);
     }
@@ -211,7 +213,7 @@ public final class BuildContext {
             printBuildSummary(result, (System.nanoTime() - startNanos) / 1_000_000L);
             return false;
         }
-        Toolchain toolchain = ToolchainDetector.resolve(effective, compilerOverride);
+        Toolchain toolchain = resolveToolchain(effective);
         try {
             if (!selectedTargets.isEmpty() && buildSystem != BuildSystem.MANIFEST && buildSystem != BuildSystem.DEFAULT)
                 throw new IllegalArgumentException("--target requer build direto por manifest; backend " + buildSystem);
@@ -318,7 +320,7 @@ public final class BuildContext {
         Configuration configuration = configuration(readManifest());
         BuildSystem buildSystem = BuildSystemDetector.detect(projectPath,
                 manifestPath() != null);
-        Toolchain toolchain = ToolchainDetector.resolve(configuration.effective(), compilerOverride);
+        Toolchain toolchain = resolveToolchain(configuration.effective());
         return "project=" + projectPath
                 + ", buildSystem=" + buildSystem
                 + ", toolchain=" + (toolchain == null ? "<nenhuma>" : toolchain.displayName())
@@ -385,6 +387,15 @@ public final class BuildContext {
         Path packagesDir = ProjectManifestFiles.resolvePackagesDir(projectPath,
                 effective.getPackagesBase(), packagesOverride);
         return new Configuration(raw, effective, repository, resolver, packagesDir);
+    }
+
+    private Toolchain resolveToolchain(ManifestRootModel effective) {
+        Toolchain toolchain = ToolchainDetector.resolve(effective, compilerOverride);
+        effective.setPlatform(TargetPlatform.forToolchain(effective.getPlatform(), toolchain));
+        for (ManifestTargetModel target : effective.getTargets()) {
+            target.setPlatform(TargetPlatform.forToolchain(target.getPlatform(), toolchain));
+        }
+        return toolchain;
     }
 
     private record Configuration(ManifestRootModel raw, ManifestRootModel effective,

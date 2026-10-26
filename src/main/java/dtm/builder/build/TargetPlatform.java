@@ -44,6 +44,15 @@ public record TargetPlatform(String arch, String os, String triple) {
         return fallback(raw, warning);
     }
 
+    public static String forToolchain(String raw, Toolchain toolchain) {
+        if (raw == null || toolchain == null || toolchain.kind() != ToolchainKind.MINGW) return raw;
+        String[] parts = raw.trim().toLowerCase(Locale.ROOT).split("-");
+        if (parts.length != 2 || !parts[0].equals("windows")) return raw;
+        String arch = architecture(parts[1]);
+        if (!knownArchitecture(arch)) return raw;
+        return (arch.equals("x86") ? "i686" : arch) + "-w64-mingw32";
+    }
+
     private static TargetPlatform fallback(String raw, Consumer<String> warning) {
         if (warning != null) warning.accept("aviso: platform invalida '" + raw + "'; usando " + host().triple);
         return host();
