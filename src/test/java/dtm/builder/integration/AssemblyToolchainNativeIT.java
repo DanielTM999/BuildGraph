@@ -102,7 +102,7 @@ class AssemblyToolchainNativeIT {
     @Test void gnuPreprocessesUppercaseAssemblyAndTracksHeaderChanges() throws Exception {
         Path assembler = tool("gas", "as");
         String name = assembler.getFileName().toString();
-        String compilerName = name.replaceFirst("as(?=\\.exe$|$)", "gcc");
+        String compilerName = name.replaceFirst("(?i)as(?=\\.exe$|$)", "gcc");
         Path beside = assembler.resolveSibling(compilerName);
         Path compiler = tool("gasCompiler", Files.isRegularFile(beside) ? beside.toString() : "gcc");
         String platform = System.getProperty("buildgraph.it.gasPlatform", TargetPlatform.host().triple());
