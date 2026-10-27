@@ -75,7 +75,9 @@ public final class NativeTools {
 
     public static Toolchain compiler(ManifestRootModel m, TargetPlatform p, Toolchain fallback, Path project) {
         Toolchain tc = fallback;
-        if (specified(m.getCCompiler()) || specified(m.getCxxCompiler())) tc = ToolchainDetector.resolve(m, null);
+        if (specified(m.getCCompiler()) || specified(m.getCxxCompiler()))
+            tc = ToolchainDetector.resolve(m, null, fallback == null || fallback.cc() == null ? null : fallback.cc().toString(),
+                    fallback == null || fallback.cxx() == null ? null : fallback.cxx().toString(), project);
         if (tc == null && p.nativeDestination()) tc = ToolchainDetector.resolve(m, null);
         if (!p.nativeDestination() && !specified(m.getCCompiler()) && !specified(m.getCxxCompiler())
                 && (tc == null || (tc.kind() != ToolchainKind.SYSTEM_CLANG && tc.kind() != ToolchainKind.BUNDLED_LLVM))) {
@@ -84,8 +86,8 @@ public final class NativeTools {
         }
         if (tc == null) throw new IllegalArgumentException("Nenhuma toolchain C/C++ encontrada para " + p.triple());
         if (specified(m.getCCompiler()) || specified(m.getCxxCompiler())) {
-            Path cc = specified(m.getCCompiler()) ? executable(m.getCCompiler(), "gcc", project) : null;
-            Path cxx = specified(m.getCxxCompiler()) ? executable(m.getCxxCompiler(), "g++", project) : cc;
+            Path cc = specified(m.getCCompiler()) ? executable(m.getCCompiler(), "gcc", project) : tc.cc();
+            Path cxx = specified(m.getCxxCompiler()) ? executable(m.getCxxCompiler(), "g++", project) : tc.cxx();
             tc = new Toolchain(tc.kind(), cc, cxx);
         }
         if (tc.isMsvc() && !p.windows()) throw new IllegalArgumentException("MSVC incompativel com " + p.triple());

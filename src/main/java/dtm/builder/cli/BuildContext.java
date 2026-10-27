@@ -45,6 +45,8 @@ public final class BuildContext {
     private final String repoOverride;
     private final String profileOverride;
     private final String compilerOverride;
+    private final String cCompilerOverride;
+    private final String cxxCompilerOverride;
     private final String packagesOverride;
     private final Printer printer;
     private final int jobs;
@@ -76,6 +78,16 @@ public final class BuildContext {
                         String compilerOverride, String packagesOverride, Printer printer,
                         int jobs, java.util.List<String> onlyTargets, String testMainOverride,
                         boolean incremental) {
+        this(projectPath, repoOverride, profileOverride, compilerOverride, packagesOverride, printer,
+                jobs, onlyTargets, testMainOverride, incremental, null, null);
+    }
+
+    public BuildContext(Path projectPath, String repoOverride, String profileOverride,
+                        String compilerOverride, String packagesOverride, Printer printer,
+                        int jobs, java.util.List<String> onlyTargets, String testMainOverride,
+                        boolean incremental, String cCompilerOverride, String cxxCompilerOverride) {
+        this.cCompilerOverride = cCompilerOverride;
+        this.cxxCompilerOverride = cxxCompilerOverride;
         this.projectPath = ProjectManifestFiles.normalizeRoot(projectPath);
         this.repoOverride = repoOverride;
         this.profileOverride = profileOverride;
@@ -390,7 +402,7 @@ public final class BuildContext {
     }
 
     private Toolchain resolveToolchain(ManifestRootModel effective) {
-        Toolchain toolchain = ToolchainDetector.resolve(effective, compilerOverride);
+        Toolchain toolchain = ToolchainDetector.resolve(effective, compilerOverride, cCompilerOverride, cxxCompilerOverride, projectPath);
         effective.setPlatform(TargetPlatform.forToolchain(effective.getPlatform(), toolchain));
         for (ManifestTargetModel target : effective.getTargets()) {
             target.setPlatform(TargetPlatform.forToolchain(target.getPlatform(), toolchain));

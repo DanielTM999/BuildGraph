@@ -45,9 +45,6 @@ public final class CompilationDatabaseGenerator {
         if (sourcesByTarget.isEmpty()) {
             return "[]";
         }
-        if (toolchain == null) {
-            throw new IllegalStateException("Nenhuma toolchain C/C++ encontrada");
-        }
 
         TargetGraph graph = TargetGraph.of(resolution.targets());
         PackagePaths packagePaths = PackagePaths.resolve(packagesDir);
@@ -69,12 +66,14 @@ public final class CompilationDatabaseGenerator {
             if (targetManifest != null && dtm.builder.build.NativeTools.specified(targetManifest.getPlatform()))
                 targetManifest.setPlatform(dtm.builder.build.TargetPlatform.resolve(targetManifest.getPlatform(), null).triple());
             boolean cpp = SourceCollector.isCppSources(List.of(source));
-            String extension = toolchain.isMsvc() ? ".obj" : ".o";
+            Toolchain sourceToolchain = dtm.builder.build.NativeTools.compiler(targetManifest,
+                    dtm.builder.build.TargetPlatform.resolve(targetManifest.getPlatform(), null), toolchain, projectPath);
+            String extension = sourceToolchain.isMsvc() ? ".obj" : ".o";
             String base = sanitize(source.getFileName().toString());
             Path output = buildDir.resolve(".clangd")
                     .resolve(index++ + "-" + base + extension)
                     .toAbsolutePath().normalize();
-            CompileSpec spec = new CompileSpec(toolchain, cpp, targetManifest,
+            CompileSpec spec = new CompileSpec(sourceToolchain, cpp, targetManifest,
                     target.type() == TargetType.SHARED,
                     List.of(source), output, packagePaths.includeDirs(),
                     packagePaths.libraryDirs(), packagePaths.linkLibraries(), buildMode,

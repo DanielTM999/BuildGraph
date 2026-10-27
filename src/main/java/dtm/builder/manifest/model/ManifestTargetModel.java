@@ -20,6 +20,14 @@ public class ManifestTargetModel extends NativeOptions {
     private String name;
     private String type;
     private String platform;
+    @com.fasterxml.jackson.annotation.JsonProperty("cCompiler")
+    private String cCompiler;
+    public String getCCompiler() { return cCompiler; }
+    public void setCCompiler(String value) { cCompiler = value; }
+    @com.fasterxml.jackson.annotation.JsonProperty("cxxCompiler")
+    private String cxxCompiler;
+    public String getCxxCompiler() { return cxxCompiler; }
+    public void setCxxCompiler(String value) { cxxCompiler = value; }
     public String getPlatform() { return platform; }
     public void setPlatform(String value) { platform = value; }
 

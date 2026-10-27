@@ -27,7 +27,9 @@ public class ManifestRootModel extends NativeOptions {
     private String cxxStandard;
     private String toolchainVersion;
     private String platform;
+    @com.fasterxml.jackson.annotation.JsonProperty("cCompiler")
     private String cCompiler;
+    @com.fasterxml.jackson.annotation.JsonProperty("cxxCompiler")
     private String cxxCompiler;
     private String sysroot;
     private boolean library;
@@ -171,6 +173,7 @@ public class ManifestRootModel extends NativeOptions {
         this.platform = platform;
     }
 
+    @com.fasterxml.jackson.annotation.JsonProperty("cCompiler")
     public String getCCompiler() {
         return cCompiler;
     }
@@ -179,6 +182,7 @@ public class ManifestRootModel extends NativeOptions {
         this.cCompiler = cCompiler;
     }
 
+    @com.fasterxml.jackson.annotation.JsonProperty("cxxCompiler")
     public String getCxxCompiler() {
         return cxxCompiler;
     }

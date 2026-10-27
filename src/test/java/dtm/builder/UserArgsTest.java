@@ -7,6 +7,18 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class UserArgsTest {
+    @Test
+    void acceptsSeparateCompilersAndRejectsMissingValues() {
+        UserArgs args = new UserArgs(new String[]{"--compile-commands", "--compiler", "common",
+                "--c-compiler", "C:/tool chain/gcc.exe", "--cxx-compiler", "g++"});
+        assertFalse(args.isInvalidCommand());
+        assertEquals("common", args.getCompiler());
+        assertEquals("C:/tool chain/gcc.exe", args.getCCompiler());
+        assertEquals("g++", args.getCxxCompiler());
+        assertTrue(new UserArgs(new String[]{"--c-compiler"}).isInvalidCommand());
+        assertTrue(new UserArgs(new String[]{"--cxx-compiler", ""}).isInvalidCommand());
+    }
+
 
     @Test
     void noArgsInfersBuildInCurrentDir() {

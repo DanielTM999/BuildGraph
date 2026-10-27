@@ -11,6 +11,8 @@ public final class UserArgs {
     public static final String FORMAT = "format";
     public static final String PROFILE = "profile";
     public static final String COMPILER = "compiler";
+    public static final String C_COMPILER = "c_compiler";
+    public static final String CXX_COMPILER = "cxx_compiler";
     public static final String REPO = "repo";
     public static final String PACKAGES = "packages_dir";
     public static final String COMPILE_COMMANDS = "compile_commands";
@@ -65,6 +67,14 @@ public final class UserArgs {
 
     public String getCompiler() {
         return argsMap.getOrDefault(COMPILER, "");
+    }
+
+    public String getCCompiler() {
+        return argsMap.getOrDefault(C_COMPILER, "");
+    }
+
+    public String getCxxCompiler() {
+        return argsMap.getOrDefault(CXX_COMPILER, "");
     }
 
     public boolean hasCompiler() {
@@ -231,6 +241,11 @@ public final class UserArgs {
                 case "-f", "-format", "--format" -> i = readValue(args, i, FORMAT);
                 case "-p", "-profile", "--profile" -> i = readValue(args, i, PROFILE);
                 case "-c", "-compiler", "--compiler" -> i = readValue(args, i, COMPILER);
+                case "--c-compiler", "--cxx-compiler" -> {
+                    String key = arg.equals("--c-compiler") ? C_COMPILER : CXX_COMPILER;
+                    i = readValue(args, i, key);
+                    if (argsMap.getOrDefault(key, "").isBlank()) invalid(arg + " requer um compilador");
+                }
                 case "--test-main" -> {
                     i = readValue(args, i, TEST_MAIN);
                     if (argsMap.getOrDefault(TEST_MAIN, "").isBlank()) {

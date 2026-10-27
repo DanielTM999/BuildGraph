@@ -104,6 +104,32 @@ public final class ToolchainDetector {
         return null;
     }
 
+    public static Toolchain resolve(ManifestRootModel manifest, String compilerOverride,
+                                    String cOverride, String cxxOverride, Path project) {
+        String cc = first(manifest == null ? null : manifest.getCCompiler(), cOverride, compilerOverride);
+        String cxx = first(manifest == null ? null : manifest.getCxxCompiler(), cxxOverride, compilerOverride);
+        if (!notBlank(cc) && !notBlank(cxx)) return resolve(manifest, compilerOverride);
+        Path cPath = notBlank(cc) ? NativeTools.executable(cc, "gcc", project) : null;
+        Path cxxPath = notBlank(cxx) ? NativeTools.executable(cxx, "g++", project) : null;
+        if (cPath == null) cPath = companion(cxxPath, false);
+        if (cxxPath == null) cxxPath = companion(cPath, true);
+        return new Toolchain(inferKind(cPath, cxxPath), cPath, cxxPath);
+    }
+
+    private static Path companion(Path driver, boolean cpp) {
+        String name = executableName(driver);
+        if (name.equals("cl") || name.equals("clang-cl")) return driver;
+        String other = name.contains("clang") ? (cpp ? "clang++" : "clang")
+                : name.contains("gcc") || name.contains("g++") ? (cpp ? name.replace("gcc", "g++") : name.replace("g++", "gcc")) : name;
+        Path candidate = driver.resolveSibling(other + (ToolProbe.isWindows() ? ".exe" : ""));
+        return Files.isRegularFile(candidate) ? candidate : driver;
+    }
+
+    private static String first(String... values) {
+        for (String value : values) if (notBlank(value)) return value;
+        return null;
+    }
+
     private static Path resolvePath(String exe) {
         Path found = ToolProbe.findOnPath(exe);
         return found != null ? found : Path.of(exe);
