@@ -485,6 +485,7 @@ Campos de cada target:
 | `includes`, `defines` | string[] | Somados aos da raiz; `excludeIncludes`/`excludeDefines` removem herdados. |
 | `compileFlags`, `asmFlags`, `linkFlags` | string[] | Concatenados aos da raiz; aplicados respectivamente a C/C++, ASM e link. |
 | `platform` | string | Destino do target; sobrescreve raiz/profile. Ausente ou inválido usa a máquina local. |
+| `cCompiler`, `cxxCompiler` | string | Drivers C e C++ do target; sobrescrevem raiz/profile e permitem toolchains distintas por arquitetura. |
 | `asmFormat` | string | Formato do assembler: `auto` (default), `bin`, `elf32`, `elf64`, `win32`, `win64`, `macho32` ou `macho64`, conforme o destino e a ferramenta. |
 | `outputName` | string | Caminho relativo da saída dentro de `outputDir`; default segue nome, tipo e plataforma do target. |
 | `linkMode` | string | `auto` (default), `driver` ou `linker`. |

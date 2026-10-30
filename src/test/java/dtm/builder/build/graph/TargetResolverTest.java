@@ -61,6 +61,36 @@ class TargetResolverTest {
     }
 
     @Test
+    void targetCompilersOverrideRootAndProfileById() {
+        ManifestRootModel effective = manifest("""
+                { "id": "os", "version": "1",
+                  "cCompiler": "root-gcc", "cxxCompiler": "root-g++",
+                  "activeProfile": "cross",
+                  "targets": [
+                    { "id": "x86", "sources": ["x86"], "platform": "x86_64-elf",
+                      "cCompiler": "x86_64-elf-gcc", "cxxCompiler": "x86_64-elf-g++" },
+                    { "id": "arm", "sources": ["arm"], "platform": "aarch64-elf",
+                      "cCompiler": "aarch64-elf-gcc" }
+                  ],
+                  "profiles": { "cross": { "targets": [
+                    { "id": "x86", "cCompiler": "profile-x86-gcc" }
+                  ] } } }
+                """);
+        TargetResolution r = TargetResolver.resolve(effective, PROJECT, false);
+        assertTrue(r.isOk(), String.join("; ", r.errors()));
+        assertEquals("root-gcc", effective.getCCompiler());
+        assertEquals("profile-x86-gcc", effective.getTargets().get(0).getCCompiler());
+        ManifestRootModel x86 = TargetResolver.perTargetManifest(effective, r.targets().get(0));
+        ManifestRootModel arm = TargetResolver.perTargetManifest(effective, r.targets().get(1));
+        assertEquals("profile-x86-gcc", x86.getCCompiler());
+        assertEquals("x86_64-elf-g++", x86.getCxxCompiler());
+        assertEquals("aarch64-elf-gcc", arm.getCCompiler());
+        assertEquals("root-g++", arm.getCxxCompiler());
+        assertEquals("x86_64-elf", x86.getPlatform());
+        assertEquals("aarch64-elf", arm.getPlatform());
+    }
+
+    @Test
     void excludeRemovesInheritedRootSources() {
         TargetResolution r = TargetResolver.resolve(manifest("""
                 { "id": "vema", "version": "1",

@@ -93,6 +93,20 @@ class NativeBuildTest {
         }
     }
 
+    @Test void usesCompilerConfiguredOnEachTarget() throws Exception {
+        ManifestRootModel m = manifest();
+        var installer = target("installer", "executable", "installer.c");
+        installer.setCCompiler("installer-gcc");
+        var kernel = target("kernel", "executable", "kernel.c");
+        kernel.setCCompiler("kernel-gcc");
+        m.setTargets(List.of(installer, kernel));
+        FakeTools tools = new FakeTools();
+        BuildResult result = BuildExecutor.build(request(m, tools));
+        assertTrue(result.success(), result.message());
+        assertTrue(tools.commands.stream().anyMatch(cmd -> cmd.getFirst().endsWith("installer-gcc")));
+        assertTrue(tools.commands.stream().anyMatch(cmd -> cmd.getFirst().endsWith("kernel-gcc")));
+    }
+
     @Test void selectedChainSkipsUnrelatedToolsAndDeduplicatesArchivedObjects() throws Exception {
         ManifestRootModel m = manifest();
         var asm = target("asm", "object", "helper.asm");

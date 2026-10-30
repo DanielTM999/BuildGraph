@@ -10,11 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Regras de composição compartilhadas entre profiles e targets:
- * scalars sobrescrevem, listas são união ordenada (com exclusões),
- * flags concatenam e maps fazem merge por chave.
- */
+
 public final class ManifestMerge {
 
     private ManifestMerge() {
@@ -141,6 +137,8 @@ public final class ManifestMerge {
         ManifestTargetModel out = new ManifestTargetModel();
         dtm.builder.manifest.model.NativeOptions.merge(base, override, out);
         out.setPlatform(pick(base.getPlatform(), override.getPlatform()));
+        out.setCCompiler(pick(base.getCCompiler(), override.getCCompiler()));
+        out.setCxxCompiler(pick(base.getCxxCompiler(), override.getCxxCompiler()));
         out.setId(pick(base.getId(), override.getId()));
         out.setName(pick(base.getName(), override.getName()));
         out.setType(pick(base.getType(), override.getType()));

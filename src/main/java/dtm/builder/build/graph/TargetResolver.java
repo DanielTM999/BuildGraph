@@ -89,8 +89,10 @@ public final class TargetResolver {
         out.setToolchainVersion(effective.getToolchainVersion());
         out.setPlatform(ManifestMerge.pick(effective.getPlatform(),
                 target.options() == null ? null : target.options().getPlatform()));
-        out.setCCompiler(effective.getCCompiler());
-        out.setCxxCompiler(effective.getCxxCompiler());
+        out.setCCompiler(ManifestMerge.pick(effective.getCCompiler(),
+                target.options() == null ? null : target.options().getCCompiler()));
+        out.setCxxCompiler(ManifestMerge.pick(effective.getCxxCompiler(),
+                target.options() == null ? null : target.options().getCxxCompiler()));
         out.setSysroot(effective.getSysroot());
         out.setLibrary(target.type().isLibrary());
         out.setOutputDir(effective.getOutputDir());

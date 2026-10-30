@@ -21,7 +21,9 @@ public class ManifestProfileModel extends NativeOptions {
     private String cStandard;
     private String cxxStandard;
     private String sysroot;
+    @com.fasterxml.jackson.annotation.JsonProperty("cCompiler")
     private String cCompiler;
+    @com.fasterxml.jackson.annotation.JsonProperty("cxxCompiler")
     private String cxxCompiler;
     private String outputDir;
     private String packagesBase;
