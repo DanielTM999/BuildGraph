@@ -48,7 +48,8 @@ public final class CommandDispatcher {
         BuildContext context = new BuildContext(projectPath, args.getRepoPath(),
                 args.getProfile(), args.getCompiler(), args.getPackagesDir(), printer,
                 args.getJobs(), args.getTargets(), args.getTestMain(),
-                !args.hasNoIncremental(), args.getCCompiler(), args.getCxxCompiler());
+                !args.hasNoIncremental(), args.getCCompiler(), args.getCxxCompiler(),
+                args.hasSkipTests(), args.getSkippedTests());
 
         if (args.hasCompileCommands()) {
             try {
@@ -136,7 +137,7 @@ public final class CommandDispatcher {
         printer.println(Severity.NONE,
                 "                [--compile-commands] [-t <target>] [-j <jobs>]");
         printer.println(Severity.NONE,
-                "                [--no-incremental]");
+                "                [--no-incremental] [--skip-tests] [--skip-test <file>]");
         printer.println(Severity.NONE, "");
         printer.println(Severity.NONE, "  projectPath   diretorio do projeto (default: diretorio atual)");
         printer.println(Severity.NONE, "  clean/build/package/install/test  fases do lifecycle (default: build; package = build)");
@@ -151,6 +152,9 @@ public final class CommandDispatcher {
         printer.println(Severity.NONE, "  --c-compiler compilador C (fallback do manifest, precede --compiler)");
         printer.println(Severity.NONE, "  --cxx-compiler compilador C++ (fallback do manifest, precede --compiler)");
         printer.println(Severity.NONE, "  --test-main   arquivo com main() (fallback de testMain)");
+        printer.println(Severity.NONE, "  --skip-tests  ignora todos os testes (soma a skipTests)");
+        printer.println(Severity.NONE, "  --skip-test   ignora arquivo, pasta ou glob de testFolder (soma a excludeTests);");
+        printer.println(Severity.NONE, "                repetivel ou separado por virgula; ctest -E / meson --no-suite");
         printer.println(Severity.NONE, "  --repo/--external  repo adicional; default final: ~/.buildgraph/repository");
         printer.println(Severity.NONE, "  --packages/--out   pasta local (fallback de packagesBase)");
         printer.println(Severity.NONE, "  --compile-commands/--clangd  imprime compile_commands.json no stdout");

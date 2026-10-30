@@ -7,6 +7,8 @@ Todas as mudanças relevantes serão documentadas neste arquivo. O formato segue
 
 ### Adicionado
 
+- `--skip-tests`/`skipTests` ignoram todos os testes; `--skip-test`/`excludeTests` ignoram arquivos,
+  pastas ou globs de testes (`ctest -E` e `meson --no-suite` em backends externos).
 - Targets ASM com NASM, GNU assembler e MASM, inclusive combinados com C e C++.
 - Ferramentas globais/per-target, formatos de saída, objetos e binários puros, e plataforma por target.
 - Alias `package` e seleção `--target` consistente em build, clean, test e install.

@@ -50,7 +50,7 @@ buildgraph [projectPath] [clean] [build] [test] [install] [refresh] [lock]
            [--test-main arquivo]
            [-t target] [-j jobs]
            [--repo caminho] [--packages caminho] [--compile-commands]
-           [--no-incremental]
+           [--no-incremental] [--skip-tests] [--skip-test arquivo]
 ```
 
 Se `projectPath` não for informado, o diretório atual será usado. Sem uma fase explícita,
@@ -71,6 +71,8 @@ BuildGraph executa `build`.
 | `--c-compiler` | Fallback do compilador C; precede `--compiler` e respeita o manifest. |
 | `--cxx-compiler` | Fallback do compilador C++; precede `--compiler` e respeita o manifest. |
 | `--test-main` | Arquivo que define `main()`, relativo a `testFolder`; fallback de `testMain`. |
+| `--skip-tests` | Ignora todos os testes na fase `test`; soma-se a `skipTests` do manifest. |
+| `--skip-test` | Ignora um arquivo, pasta ou glob de testes; repetível ou separado por vírgula. Soma-se a `excludeTests`. |
 | `--repo`, `--external` | Repositório adicional, depois dos repositórios do manifest. |
 | `--packages`, `--out` | Pasta local usada quando `packagesBase` não está configurado. |
 | `--compile-commands`, `--clangd` | Imprime um `compile_commands.json` resolvido no stdout e encerra. |
@@ -376,6 +378,8 @@ Campos desconhecidos são ignorados. Listas e mapas nulos são tratados como vaz
 | `sources` | string[] | Pastas ou arquivos de fonte C/C++ relativos ao projeto. |
 | `testFolder` | string | Pasta de fontes de teste relativa ao projeto. Ausente ou vazia usa `<projeto>/tests`. |
 | `testMain` | string | Arquivo com `main()`, relativo a `testFolder`. Ausente ou vazio procura exatamente um `main()` na pasta. |
+| `skipTests` | boolean | `true` faz a fase `test` terminar com sucesso sem compilar nem executar testes. |
+| `excludeTests` | string[] | Testes ignorados: arquivos, pastas ou globs relativos a `testFolder` (veja [Ignorar testes](#ignorar-testes)). No XML, `<excludeTests><excludeTest>…</excludeTest></excludeTests>`. |
 | `includes` | string[] | Pastas de headers adicionadas à linha de compilação. |
 | `defines` | string[] | Macros; `-D` ou `/D` é acrescentado quando necessário. |
 | `compileFlags` | string[] | Argumentos extras inseridos na compilação. |
@@ -827,6 +831,31 @@ como `.git`, `.buildgraph`, `.idea`, `build`, `out` e `cmake-build-*`, são igno
 Para testes diretos, fontes sob `test` e `tests` são compiladas junto com as fontes do projeto,
 exceto arquivos cujo nome começa com `main.`. O executável de teste é iniciado e seu exit code
 define o resultado. Se nenhuma fonte de teste existir, a fase termina com sucesso.
+
+### Ignorar testes
+
+Todos os testes podem ser ignorados com `--skip-tests` ou `skipTests: true`. A fase `test` termina
+com sucesso sem compilar nem executar a suíte; o build continua acontecendo quando a fase o exige.
+
+Testes específicos são ignorados com `--skip-test` (repetível ou separado por vírgula) ou com
+`excludeTests`. Os valores da CLI somam-se aos do manifest. No build direto, cada valor é relativo a
+`testFolder` e pode ser:
+
+- um arquivo: `jit/alloc_test.cpp`;
+- uma pasta, que ignora tudo abaixo dela: `jit`;
+- um glob com `*`, `?` e `**`: `**/*_bench.cpp`. Um glob sem `/` também casa com o nome do
+  arquivo em qualquer subpasta.
+
+Os arquivos correspondentes ficam fora do executável de testes. Ignorar o arquivo com o `main()` dos
+testes é erro, e valores sem correspondência geram um aviso. Em backends externos, os valores viram
+`ctest -E <v1|v2>` (expressão regular de nomes do CTest) e `meson test --no-suite <v>`; `make test`
+não oferece filtro e falha quando há exclusões.
+
+```shell
+buildGraph test --skip-tests
+buildGraph test --skip-test jit/alloc_test.cpp --skip-test gc
+buildGraph test --skip-test "**/*_bench.cpp,lento"
+```
 
 No build direto, executáveis usam `name`, depois `id`, depois o nome da pasta do projeto. Bibliotecas
 com `library: true` geram `.dll` no Windows, `.dylib` no macOS e `.so` no Linux. Todos são escritos

@@ -27,6 +27,39 @@ class ManifestParserTest {
         assertEquals(java.util.List.of("repo/a", "D:/repo-b"), xml.getRepositories());
     }
 
+    @Test
+    void parsesSkipTestsAndExcludeTestsFromJsonAndXmlAndKeepsThemInEffectiveManifest() {
+        ManifestRootModel json = ManifestParser.readManifest(
+                "{\"skipTests\":true,\"excludeTests\":[\"jit/alloc.cpp\",\"gc\"]}", false).getManifest();
+        ManifestRootModel xml = ManifestParser.readManifest("""
+                <Manifest>
+                  <skipTests>true</skipTests>
+                  <excludeTests>
+                    <excludeTest>jit/alloc.cpp</excludeTest>
+                    <excludeTest>gc</excludeTest>
+                  </excludeTests>
+                </Manifest>
+                """, true).getManifest();
+        ManifestRootModel absent = ManifestParser.readManifest("{}", false).getManifest();
+
+        assertTrue(json.isSkipTests());
+        assertTrue(xml.isSkipTests());
+        assertFalse(absent.isSkipTests());
+        assertEquals(java.util.List.of("jit/alloc.cpp", "gc"), json.getExcludeTests());
+        assertEquals(java.util.List.of("jit/alloc.cpp", "gc"), xml.getExcludeTests());
+        assertTrue(absent.getExcludeTests().isEmpty());
+        ManifestRootModel effective = ManifestProfiles.effective(json);
+        assertTrue(effective.isSkipTests());
+        assertEquals(java.util.List.of("jit/alloc.cpp", "gc"), effective.getExcludeTests());
+    }
+
+    @Test
+    void omitsDefaultSkipTestsFieldsWhenWriting() throws Exception {
+        String written = ManifestParser.writeString(ManifestParser.readManifest("{\"name\":\"a\"}", false).getManifest(), false);
+        assertFalse(written.contains("skipTests"), written);
+        assertFalse(written.contains("excludeTests"), written);
+    }
+
     private static final String JSON = """
             {
               "id": "MyProjectTeste",

@@ -19,6 +19,8 @@ public final class UserArgs {
     public static final String TARGETS = "targets";
     public static final String JOBS = "jobs";
     public static final String TEST_MAIN = "test_main";
+    public static final String SKIP_TESTS = "skip_tests";
+    public static final String SKIPPED_TESTS = "skipped_tests";
 
     public static final String HAS_HELP = "has_help";
     public static final String INVALID_COMMAND = "invalid_command";
@@ -154,9 +156,21 @@ public final class UserArgs {
         return flag(NO_INCREMENTAL);
     }
 
+    public boolean hasSkipTests() {
+        return flag(SKIP_TESTS);
+    }
+
+    public java.util.List<String> getSkippedTests() {
+        return list(SKIPPED_TESTS);
+    }
+
     /** Ids passados via --target (repetível ou separados por vírgula). */
     public java.util.List<String> getTargets() {
-        String raw = argsMap.getOrDefault(TARGETS, "");
+        return list(TARGETS);
+    }
+
+    private java.util.List<String> list(String key) {
+        String raw = argsMap.getOrDefault(key, "");
         if (raw.isBlank()) {
             return java.util.List.of();
         }
@@ -254,7 +268,11 @@ public final class UserArgs {
                 }
                 case "--repo", "--external", "-repo" -> i = readValue(args, i, REPO);
                 case "--packages", "--out", "-o" -> i = readValue(args, i, PACKAGES);
-                case "--target", "-t", "--targets" -> i = appendValue(args, i, TARGETS);
+                case "--target", "-t", "--targets" ->
+                        i = appendValue(args, i, TARGETS, "--target requer o id de um target");
+                case "--skip-tests" -> argsMap.put(SKIP_TESTS, "true");
+                case "--skip-test" ->
+                        i = appendValue(args, i, SKIPPED_TESTS, "--skip-test requer um arquivo de teste");
                 case "-j", "--jobs" -> {
                     i = readValue(args, i, JOBS);
                     String jobs = argsMap.getOrDefault(JOBS, "");
@@ -273,10 +291,10 @@ public final class UserArgs {
         }
     }
 
-    private int appendValue(String[] args, int index, String key) {
+    private int appendValue(String[] args, int index, String key, String error) {
         if (hasValue(args, index)) {
             if (java.util.Arrays.stream(args[index + 1].split(",", -1)).allMatch(String::isBlank)) {
-                invalid("--target requer o id de um target");
+                invalid(error);
                 return index + 1;
             }
             String current = argsMap.getOrDefault(key, "");
@@ -284,7 +302,7 @@ public final class UserArgs {
                     : current + "," + args[index + 1]);
             return index + 1;
         }
-        invalid("--target requer o id de um target");
+        invalid(error);
         return index;
     }
 

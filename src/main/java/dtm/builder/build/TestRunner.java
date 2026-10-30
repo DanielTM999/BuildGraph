@@ -14,6 +14,10 @@ public final class TestRunner {
     }
 
     public static BuildResult test(BuildRequest req) {
+        if (req.manifest() != null && req.manifest().isSkipTests()) {
+            req.output().accept("Testes ignorados (skipTests)");
+            return BuildResult.ok(0, null, "Testes ignorados");
+        }
         return switch (req.buildSystem()) {
             case CMAKE -> ctest(req);
             case MESON -> mesonTest(req);
@@ -23,25 +27,35 @@ public final class TestRunner {
     }
 
     private static BuildResult ctest(BuildRequest req) {
-        List<String> cmd = List.of("ctest", "--test-dir", req.buildDir().toString(),
-                "--output-on-failure");
+        List<String> cmd = new ArrayList<>(List.of("ctest", "--test-dir", req.buildDir().toString(),
+                "--output-on-failure"));
+        List<String> excluded = excluded(req);
+        if (!excluded.isEmpty()) {
+            cmd.add("-E");
+            cmd.add(String.join("|", excluded));
+        }
         req.output().accept("+ " + String.join(" ", cmd));
-        int e = ProcessRunner.run(cmd, req.projectPath(), null, req.output());
+        int e = req.executor().run(cmd, req.projectPath(), null, req.output());
         return e == 0 ? BuildResult.ok(e, null, "Testes OK") : BuildResult.fail(e, "ctest falhou");
     }
 
     private static BuildResult mesonTest(BuildRequest req) {
-        List<String> cmd = List.of("meson", "test", "-C", req.buildDir().toString(),
-                "--print-errorlogs");
+        List<String> cmd = new ArrayList<>(List.of("meson", "test", "-C", req.buildDir().toString(),
+                "--print-errorlogs"));
+        for (String suite : excluded(req)) {
+            cmd.add("--no-suite");
+            cmd.add(suite);
+        }
         req.output().accept("+ " + String.join(" ", cmd));
-        int e = ProcessRunner.run(cmd, req.projectPath(), null, req.output());
+        int e = req.executor().run(cmd, req.projectPath(), null, req.output());
         return e == 0 ? BuildResult.ok(e, null, "Testes OK") : BuildResult.fail(e, "meson test falhou");
     }
 
     private static BuildResult makeTest(BuildRequest req) {
+        if (!excluded(req).isEmpty()) return BuildResult.fail(1, "make test nao suporta excludeTests/--skip-test");
         List<String> cmd = List.of("make", "test");
         req.output().accept("+ " + String.join(" ", cmd));
-        int e = ProcessRunner.run(cmd, req.projectPath(), null, req.output());
+        int e = req.executor().run(cmd, req.projectPath(), null, req.output());
         return e == 0 ? BuildResult.ok(e, null, "Testes OK") : BuildResult.fail(e, "make test falhou");
     }
 
@@ -51,6 +65,16 @@ public final class TestRunner {
         if (testSources.isEmpty()) return BuildResult.ok(0, null, "Nenhum teste encontrado");
         TestMainResolver.Result main = TestMainResolver.resolve(req.projectPath(), manifest, testSources);
         if (!main.success()) return BuildResult.fail(1, main.error());
+        TestExclusions exclusions = TestExclusions.of(req.projectPath(), manifest);
+        if (!exclusions.isEmpty()) {
+            if (exclusions.excludes(main.source()))
+                return BuildResult.fail(1, "O arquivo com main() dos testes nao pode ser ignorado: " + main.source());
+            int total = testSources.size();
+            testSources = exclusions.filter(testSources);
+            for (String pattern : exclusions.unmatched())
+                req.output().accept("aviso: teste ignorado sem correspondencia em testFolder: " + pattern);
+            req.output().accept("Testes ignorados: " + (total - testSources.size()) + " arquivo(s)");
+        }
         boolean msvc = req.toolchain() != null && req.toolchain().isMsvc();
         dtm.builder.build.graph.TargetGraph selected;
         try {
@@ -96,4 +120,11 @@ public final class TestRunner {
         return exit == 0 ? BuildResult.ok(0, artifact, "Testes OK") : BuildResult.fail(exit, "Testes falharam");
     }
 
+    private static List<String> excluded(BuildRequest req) {
+        List<String> out = new ArrayList<>();
+        if (req.manifest() == null || req.manifest().getExcludeTests() == null) return out;
+        for (String test : req.manifest().getExcludeTests())
+            if (test != null && !test.isBlank() && !out.contains(test.trim())) out.add(test.trim());
+        return out;
+    }
 }

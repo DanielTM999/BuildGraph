@@ -38,6 +38,14 @@ public class ManifestRootModel extends NativeOptions {
     private String activeProfile;
     private String testFolder;
     private String testMain;
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_DEFAULT)
+    private boolean skipTests;
+
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_EMPTY)
+    @JsonSetter(nulls = Nulls.SKIP)
+    @JacksonXmlElementWrapper(localName = "excludeTests")
+    @JacksonXmlProperty(localName = "excludeTest")
+    private List<String> excludeTests = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
     @JacksonXmlElementWrapper(localName = "repositories")
@@ -245,6 +253,22 @@ public class ManifestRootModel extends NativeOptions {
 
     public void setTestMain(String testMain) {
         this.testMain = testMain;
+    }
+
+    public boolean isSkipTests() {
+        return skipTests;
+    }
+
+    public void setSkipTests(boolean skipTests) {
+        this.skipTests = skipTests;
+    }
+
+    public List<String> getExcludeTests() {
+        return excludeTests;
+    }
+
+    public void setExcludeTests(List<String> excludeTests) {
+        this.excludeTests = excludeTests == null ? new ArrayList<>() : new ArrayList<>(excludeTests);
     }
 
     public List<String> getRepositories() {

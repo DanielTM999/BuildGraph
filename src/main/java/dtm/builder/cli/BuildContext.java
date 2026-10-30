@@ -53,6 +53,8 @@ public final class BuildContext {
     private final java.util.List<String> onlyTargets;
     private final String testMainOverride;
     private final boolean incremental;
+    private final boolean skipTests;
+    private final java.util.List<String> skippedTests;
 
     public BuildContext(Path projectPath, String repoOverride, String profileOverride,
                         String compilerOverride, String packagesOverride, Printer printer) {
@@ -86,6 +88,16 @@ public final class BuildContext {
                         String compilerOverride, String packagesOverride, Printer printer,
                         int jobs, java.util.List<String> onlyTargets, String testMainOverride,
                         boolean incremental, String cCompilerOverride, String cxxCompilerOverride) {
+        this(projectPath, repoOverride, profileOverride, compilerOverride, packagesOverride, printer,
+                jobs, onlyTargets, testMainOverride, incremental, cCompilerOverride, cxxCompilerOverride,
+                false, java.util.List.of());
+    }
+
+    public BuildContext(Path projectPath, String repoOverride, String profileOverride,
+                        String compilerOverride, String packagesOverride, Printer printer,
+                        int jobs, java.util.List<String> onlyTargets, String testMainOverride,
+                        boolean incremental, String cCompilerOverride, String cxxCompilerOverride,
+                        boolean skipTests, java.util.List<String> skippedTests) {
         this.cCompilerOverride = cCompilerOverride;
         this.cxxCompilerOverride = cxxCompilerOverride;
         this.projectPath = ProjectManifestFiles.normalizeRoot(projectPath);
@@ -98,6 +110,8 @@ public final class BuildContext {
         this.onlyTargets = onlyTargets == null ? java.util.List.of() : onlyTargets;
         this.testMainOverride = testMainOverride;
         this.incremental = incremental;
+        this.skipTests = skipTests;
+        this.skippedTests = skippedTests == null ? java.util.List.of() : java.util.List.copyOf(skippedTests);
     }
 
     public Path projectPath() {
@@ -392,6 +406,14 @@ public final class BuildContext {
         ManifestRootModel effective = ManifestProfiles.effective(raw);
         if (!notBlank(effective.getTestMain()) && notBlank(testMainOverride)) {
             effective.setTestMain(testMainOverride.trim());
+        }
+        if (skipTests) {
+            effective.setSkipTests(true);
+        }
+        for (String test : skippedTests) {
+            if (!effective.getExcludeTests().contains(test)) {
+                effective.getExcludeTests().add(test);
+            }
         }
         GlobalRepository repository = GlobalRepository.resolve(projectPath,
                 effective.getRepositories(), repoOverride);
