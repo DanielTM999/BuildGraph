@@ -107,6 +107,36 @@ class CompilationDatabaseGeneratorTest {
         assertTrue(appArgs.contains("-I" + baseInclude.toAbsolutePath().normalize()));
     }
 
+    @Test
+    void targetCompilerOverridesFallbackAndSelectsMsvcFlags() throws Exception {
+        Files.writeString(project.resolve("main.cpp"), "int main() {}");
+        ManifestRootModel manifest = new ManifestRootModel();
+        ManifestTargetModel target = target("app", "executable", List.of("main.cpp"), List.of(), List.of());
+        target.setCCompiler("cl.exe");
+        target.setCxxCompiler("cl.exe");
+        target.setPlatform("windows-x86_64");
+        manifest.setTargets(new ArrayList<>(List.of(target)));
+        Toolchain fallback = new Toolchain(ToolchainKind.GCC, Path.of("gcc"), Path.of("g++"));
+        JsonNode entries = JsonMapper.builder().build().readTree(CompilationDatabaseGenerator.generate(
+                project, manifest, fallback, project.resolve("packages"), project.resolve("build"), "Debug"));
+        List<String> args = arguments(entries.get(0));
+        assertEquals("cl.exe", Path.of(args.get(0)).getFileName().toString());
+        assertTrue(args.contains("/c"));
+        assertFalse(args.contains("-c"));
+    }
+
+    @Test
+    void manifestCCompilerDoesNotDiscardCppFallback() throws Exception {
+        Files.writeString(project.resolve("main.cpp"), "int main() {}");
+        ManifestRootModel manifest = new ManifestRootModel();
+        manifest.setSources(new ArrayList<>(List.of("main.cpp")));
+        manifest.setCCompiler("manifest-gcc");
+        Toolchain fallback = new Toolchain(ToolchainKind.GCC, Path.of("cli-gcc"), Path.of("cli-g++"));
+        JsonNode entries = JsonMapper.builder().build().readTree(CompilationDatabaseGenerator.generate(
+                project, manifest, fallback, project.resolve("packages"), project.resolve("build"), "Debug"));
+        assertEquals("cli-g++", arguments(entries.get(0)).get(0));
+    }
+
     private static JsonNode entryFor(JsonNode entries, String fileName) {
         for (JsonNode entry : entries) {
             if (entry.get("file").asText().endsWith(fileName)) {

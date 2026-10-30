@@ -151,6 +151,7 @@ public class ManifestProfileModel extends NativeOptions {
         this.sysroot = sysroot;
     }
 
+    @com.fasterxml.jackson.annotation.JsonProperty("cCompiler")
     public String getCCompiler() {
         return cCompiler;
     }
@@ -159,6 +160,7 @@ public class ManifestProfileModel extends NativeOptions {
         this.cCompiler = cCompiler;
     }
 
+    @com.fasterxml.jackson.annotation.JsonProperty("cxxCompiler")
     public String getCxxCompiler() {
         return cxxCompiler;
     }

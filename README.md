@@ -68,6 +68,8 @@ BuildGraph executa `build`.
 | `--interactive` | Monitora o manifest e aceita comandos pela entrada padrão. |
 | `-p`, `--profile` | Profile usado somente quando o manifest não define `activeProfile`. |
 | `-c`, `--compiler` | Compilador usado somente quando o manifest não define compiladores. |
+| `--c-compiler` | Fallback do compilador C; precede `--compiler` e respeita o manifest. |
+| `--cxx-compiler` | Fallback do compilador C++; precede `--compiler` e respeita o manifest. |
 | `--test-main` | Arquivo que define `main()`, relativo a `testFolder`; fallback de `testMain`. |
 | `--repo`, `--external` | Repositório adicional, depois dos repositórios do manifest. |
 | `--packages`, `--out` | Pasta local usada quando `packagesBase` não está configurado. |
@@ -229,7 +231,7 @@ log. Erros são enviados para stderr e retornam exit code `1`. `--format` não a
 A resolução considera:
 
 - Manifest raiz e profile ativo.
-- `cCompiler` e `cxxCompiler`, com `--compiler` como fallback.
+- `cCompiler` e `cxxCompiler` da raiz, profile ou target, com `--c-compiler` e `--cxx-compiler` como fallbacks por linguagem, seguidos por `--compiler`.
 - `cStandard`, `cxxStandard`, sysroot, target, defines e flags de compilação.
 - `sources` e extensões de cada fonte.
 - Includes do projeto e de packages materializados.

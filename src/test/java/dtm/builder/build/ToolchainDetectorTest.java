@@ -8,6 +8,26 @@ import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class ToolchainDetectorTest {
+    @Test
+    void resolvesEachLanguageWithManifestThenSpecificThenCommon() {
+        ManifestRootModel manifest = new ManifestRootModel();
+        manifest.setCCompiler("manifest-gcc");
+        Toolchain tc = ToolchainDetector.resolve(manifest, "common", "cli-gcc", "cli-g++", Path.of("."));
+        assertEquals(Path.of("manifest-gcc"), tc.cc());
+        assertEquals(Path.of("cli-g++"), tc.cxx());
+        tc = ToolchainDetector.resolve(new ManifestRootModel(), "common", "cli-gcc", null, Path.of("."));
+        assertEquals(Path.of("cli-gcc"), tc.cc());
+        assertEquals(Path.of("common"), tc.cxx());
+    }
+
+    @Test
+    void resolvesProjectRelativeCompilers() {
+        Toolchain tc = ToolchainDetector.resolve(new ManifestRootModel(), null,
+                "tools/gcc", "tools/g++", Path.of("project"));
+        assertEquals(Path.of("project/tools/gcc"), tc.cc());
+        assertEquals(Path.of("project/tools/g++"), tc.cxx());
+    }
+
 
     @Test
     void manifestCompilerWinsOverCliCompiler() {
