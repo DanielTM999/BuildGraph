@@ -23,6 +23,11 @@ public final class CommandDispatcher {
         if (!applyFormat(args)) {
             return 2;
         }
+        
+        if(args.hasVersion()){
+            printVersion();
+            return 0;
+        }
 
         if (args.hasHelp()) {
             printHelp();
@@ -123,6 +128,65 @@ public final class CommandDispatcher {
             phases.add(Phase.INSTALL);
         }
         return phases;
+    }
+    
+    private void printVersion() {
+        String version = CommandDispatcher.class
+                .getPackage()
+                .getImplementationVersion();
+    
+        if (version == null || version.isBlank()) {
+            version = "dev";
+        }
+    
+        printer.println(Severity.NONE, "BuildGraph {}", version);
+    
+        try (var stream = CommandDispatcher.class
+                .getResourceAsStream("/META-INF/MANIFEST.MF")) {
+    
+            if (stream == null) {
+                return;
+            }
+    
+            var manifest = new java.util.jar.Manifest(stream);
+            var attributes = manifest.getMainAttributes();
+    
+            String buildTime = attributes.getValue("Build-Time");
+            String buildJdk = attributes.getValue("Build-Jdk");
+            String copyright = attributes.getValue("Build-Copyright");
+            String distributor = attributes.getValue("Build-Distributor");
+            String license = attributes.getValue("Build-License");
+    
+            if (copyright != null) {
+                printer.println(Severity.NONE, copyright);
+            }
+    
+            if (distributor != null) {
+                printer.println(Severity.NONE, "Distributed by: {}", distributor);
+            }
+    
+            if (license != null) {
+                printer.println(Severity.NONE, "License: {}", license);
+            }
+    
+            if (buildTime != null) {
+                var instant = java.time.Instant.parse(buildTime);
+    
+                var date = instant
+                        .atZone(java.time.ZoneId.systemDefault())
+                        .format(java.time.format.DateTimeFormatter
+                                .ofPattern("yyyy-MM-dd HH:mm:ss z"));
+    
+                printer.println(Severity.NONE, "Build date: {}", date);
+            }
+    
+            if (buildJdk != null) {
+                printer.println(Severity.NONE, "Java: {}", buildJdk);
+            }
+    
+        } catch (Exception e) {
+            printer.println(Severity.NONE, "Build metadata unavailable");
+        }
     }
 
     private void printHelp() {

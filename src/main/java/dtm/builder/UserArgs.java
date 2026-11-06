@@ -23,6 +23,7 @@ public final class UserArgs {
     public static final String SKIPPED_TESTS = "skipped_tests";
 
     public static final String HAS_HELP = "has_help";
+    public static final String HAS_VERSION = "has_version";
     public static final String INVALID_COMMAND = "invalid_command";
     public static final String INVALID_REASON = "invalid_reason";
 
@@ -142,6 +143,10 @@ public final class UserArgs {
     public boolean hasLock() {
         return flag(LOCK);
     }
+    
+    public boolean hasVersion(){
+        return flag(HAS_VERSION);
+    }
 
     public boolean isInteractive() {
         return flag(INTERACTIVE);
@@ -164,7 +169,6 @@ public final class UserArgs {
         return list(SKIPPED_TESTS);
     }
 
-    /** Ids passados via --target (repetível ou separados por vírgula). */
     public java.util.List<String> getTargets() {
         return list(TARGETS);
     }
@@ -215,6 +219,7 @@ public final class UserArgs {
         argsMap.put(BUILD, "false");
         argsMap.put(INSTALL, "false");
         argsMap.put(TEST, "false");
+        argsMap.put(HAS_VERSION, "false");
         argsMap.put(REFRESH, "false");
         argsMap.put(LOCK, "false");
         argsMap.put(INTERACTIVE, "false");
@@ -246,6 +251,7 @@ public final class UserArgs {
             String arg = args[i];
 
             switch (arg) {
+                case "--version", "-version", "--v", "-v" -> argsMap.put(HAS_VERSION, "true");
                 case "package" -> argsMap.put(BUILD, "true");
                 case CLEAN, BUILD, INSTALL, TEST, REFRESH, LOCK -> argsMap.put(arg, "true");
                 case "--interactive", "-i" -> argsMap.put(INTERACTIVE, "true");
@@ -285,8 +291,7 @@ public final class UserArgs {
             }
         }
 
-        if (!hasClean() && !hasBuild() && !hasInstall() && !hasTest()
-                && !hasRefresh() && !hasLock() && !isInteractive() && !hasCompileCommands()) {
+        if (!hasClean() && !hasBuild() && !hasInstall() && !hasTest() && !hasRefresh() && !hasLock() && !isInteractive() && !hasCompileCommands() && !hasVersion()) {
             argsMap.put(BUILD, "true");
         }
     }

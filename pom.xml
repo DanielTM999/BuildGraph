@@ -12,8 +12,8 @@
 
     <licenses>
         <license>
-            <name>MIT License</name>
-            <url>https://opensource.org/license/mit</url>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0</url>
             <distribution>repo</distribution>
         </license>
     </licenses>
@@ -28,6 +28,7 @@
         <skipNativeITs>true</skipNativeITs>
         <native.c.compiler></native.c.compiler>
         <native.cxx.compiler></native.cxx.compiler>
+        <maven.build.timestamp.format>yyyy-MM-dd'T'HH:mm:ss'Z'</maven.build.timestamp.format>
     </properties>
 
     <dependencies>
@@ -105,8 +106,23 @@
                             <minimizeJar>false</minimizeJar>
                             <transformers>
                                 <transformer
-                                        implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                
                                     <mainClass>${main.class}</mainClass>
+                                
+                                    <manifestEntries>
+                                        <Implementation-Title>${project.name}</Implementation-Title>
+                                        <Implementation-Version>${project.version}</Implementation-Version>
+                                        <Implementation-Vendor>Daniel Melo</Implementation-Vendor>
+                                
+                                        <Build-Time>${maven.build.timestamp}</Build-Time>
+                                        <Build-Jdk>${java.version}</Build-Jdk>
+                                
+                                        <Build-Copyright>Copyright (c) 2026 Daniel Melo</Build-Copyright>
+                                        <Build-Distributor>Daniel Melo</Build-Distributor>
+                                        <Build-License>Apache-2.0</Build-License>
+                                    </manifestEntries>
+                                
                                 </transformer>
                                 <transformer
                                         implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
@@ -125,6 +141,18 @@
                         </configuration>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.2</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                        </manifest>
+                    </archive>
+                </configuration>
             </plugin>
         </plugins>
     </build>
