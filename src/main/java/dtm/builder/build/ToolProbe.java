@@ -32,8 +32,7 @@ public final class ToolProbe {
         }
         boolean looksLikePath = direct.isAbsolute() || executable.contains("/") || executable.contains("\\");
         if (looksLikePath) {
-            // Ja e um caminho (absoluto ou com separador); nao faz sentido
-            // combina-lo com entradas do PATH, entao resolve apenas aqui.
+
             return Files.isRegularFile(direct) ? direct : null;
         }
 
@@ -59,7 +58,7 @@ public final class ToolProbe {
                         return p;
                     }
                 } catch (InvalidPathException e) {
-                    // Entrada de PATH ou candidato invalido; ignora e segue tentando.
+
                 }
             }
         }

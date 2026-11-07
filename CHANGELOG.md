@@ -27,3 +27,20 @@ Todas as mudanças relevantes serão documentadas neste arquivo. O formato segue
 
 - `refresh` passa a atualizar o lock implicitamente.
 - Build incremental relinka quando bibliotecas precompiladas de packages mudam.
+
+## [1.1.5] - 2026-11-06
+
+### Adicionado
+
+- Compilação paralela por arquivo com scheduler global compartilhado entre targets.
+- Controle de CPU e RAM com jobs automáticos, orçamento, reserva e estimativas por compilação.
+- Cache compartilhado persistente de objetos com SHA-256, escrita atômica, integridade e quota LRU.
+- Profiling opcional, response files para comandos longos e testes com milhares de fontes.
+- Ícones nativos no empacotamento Windows, Linux e macOS, com geração automática de ICNS.
+
+### Alterado
+
+- Verificação incremental por conteúdo, objetos com nomes estáveis e estado concorrente.
+- Cancelamento com encerramento dos subprocessos e sincronização antes de salvar o estado.
+- Empacotamento e preparação dos ícones executados diretamente no workflow, sem pasta tools.
+- Comentários de código e Javadocs removidos.

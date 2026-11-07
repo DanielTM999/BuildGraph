@@ -54,7 +54,7 @@ public final class CommandDispatcher {
                 args.getProfile(), args.getCompiler(), args.getPackagesDir(), printer,
                 args.getJobs(), args.getTargets(), args.getTestMain(),
                 !args.hasNoIncremental(), args.getCCompiler(), args.getCxxCompiler(),
-                args.hasSkipTests(), args.getSkippedTests());
+                args.hasSkipTests(), args.getSkippedTests(), args.getBuildOptions());
 
         if (args.hasCompileCommands()) {
             try {
@@ -224,7 +224,12 @@ public final class CommandDispatcher {
         printer.println(Severity.NONE, "  --compile-commands/--clangd  imprime compile_commands.json no stdout");
         printer.println(Severity.NONE, "  -t, --target  limita o lifecycle ao target indicado e suas dependencias;");
         printer.println(Severity.NONE, "                repetivel ou separado por virgula");
-        printer.println(Severity.NONE, "  -j, --jobs    limita o paralelismo entre targets (1 = serial)");
+        printer.println(Severity.NONE, "  -j, --jobs    auto ou limite global de compilacoes/links (1 = serial)");
+        printer.println(Severity.NONE, "  --memory-limit <8G>     teto de RAM para processos de build");
+        printer.println(Severity.NONE, "  --memory-per-job <768M> estimativa base por compilacao");
+        printer.println(Severity.NONE, "  --memory-reserve <512M> reserva de RAM para o sistema (padrao automatico)");
+        printer.println(Severity.NONE, "  --cache-dir <path> --cache-size <5G> --no-cache");
+        printer.println(Severity.NONE, "  --profile-build        imprime tempos e contadores de performance");
         printer.println(Severity.NONE,
                 "  build         incremental por padrao em builds diretos");
         printer.println(Severity.NONE,

@@ -4,7 +4,7 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import dtm.builder.manifest.ManifestMerge;
 import java.util.ArrayList;
 import java.util.List;
-/** Native tools shared by root, profiles and individual targets. */
+
 public class NativeOptions {
     private String asmCompiler;
     public String getAsmCompiler() { return asmCompiler; }

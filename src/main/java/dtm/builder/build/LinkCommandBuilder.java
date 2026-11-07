@@ -5,7 +5,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Link-only commands never receive C standards, preprocessor options or assembler flags. */
 public final class LinkCommandBuilder {
     private LinkCommandBuilder() { }
     public static List<String> build(Path tool, String kind, boolean driver, boolean cpp,

@@ -4,7 +4,6 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Restricoes exatas e ranges simples: Maven, comparadores, ^, ~ e wildcards. */
 public final class VersionConstraint {
 
     private final String expression;

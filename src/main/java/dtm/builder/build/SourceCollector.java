@@ -80,6 +80,8 @@ public final class SourceCollector {
         return ext.equals(".asm") || ext.equals(".s");
     }
 
+    public static boolean isSource(Path source) { return SOURCE_EXTS.contains(extensionOf(source)); }
+
     public static boolean needsPreprocessor(Path source) {
         return source.getFileName().toString().endsWith(".S");
     }

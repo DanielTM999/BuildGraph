@@ -127,8 +127,7 @@ public final class InteractiveSession {
             phases.add(phase);
         }
         if (!phases.isEmpty()) {
-            // A ordem de execucao segue o lifecycle (clean -> build -> test -> install),
-            // independente da ordem digitada.
+
             if (targetOverride) context.runPhases(phases, targets);
             else context.runPhases(phases);
         }

@@ -30,6 +30,12 @@ public final class BuildExecutor {
     }
 
     private static BuildResult directCompile(BuildRequest req) {
+        try (BuildRuntime runtime = new BuildRuntime(req)) {
+            return directCompile(req, runtime);
+        } catch (IllegalArgumentException e) { return BuildResult.fail(1, e.getMessage()); }
+    }
+
+    private static BuildResult directCompile(BuildRequest req, BuildRuntime runtime) {
         TargetGraph graph;
         try {
             graph = dtm.builder.build.graph.TargetSelection.resolve(req.manifest(), req.projectPath(),
@@ -41,23 +47,23 @@ public final class BuildExecutor {
         int total = graph.targets().stream().mapToInt(target -> {
             ManifestRootModel m = TargetResolver.perTargetManifest(req.manifest(), target);
             boolean singleStep = target.type() == TargetType.OBJECT || target.type() == TargetType.BINARY && "bin".equalsIgnoreCase(m.getAsmFormat());
-            return SourceCollector.collectSources(req.projectPath(), target.sources(), target.synthetic()).size() + (singleStep ? 0 : 1);
+            return runtime.sources(target).size() + (singleStep ? 0 : 1);
         }).sum();
-        req.output().accept("[0/" + total + "] Iniciando build");
+        runtime.output.accept("[0/" + total + "] Iniciando build");
         java.util.concurrent.atomic.AtomicInteger completed = new java.util.concurrent.atomic.AtomicInteger();
-        TargetScheduler.Result result = TargetScheduler.run(graph, req.jobs(), target -> {
+        TargetScheduler.Result result = TargetScheduler.run(graph, runtime.scheduler.workers(), target -> {
             BuildResult built = NativeTargetBuilder.build(req, target, graph,
-                    line -> req.output().accept("[" + target.id() + "] " + line),
+                    line -> runtime.output.accept("[" + target.id() + "] " + line),
                     (message, started) -> {
                         synchronized (completed) {
                             String elapsed = started == 0 ? "" : String.format(java.util.Locale.ROOT, " (%.3f s)", (System.nanoTime() - started) / 1_000_000_000.0);
-                            req.output().accept("[" + completed.incrementAndGet() + "/" + total + "] [" + target.id() + "] " + message + elapsed);
+                            runtime.output.accept("[" + completed.incrementAndGet() + "/" + total + "] [" + target.id() + "] " + message + elapsed);
                         }
-                    });
+                    }, runtime);
             return built;
-        }, req.output());
+        }, runtime.output);
         if (req.manifest() == null || req.manifest().getTargets().isEmpty())
-            return result.results().values().iterator().next();
+            return result.results().values().stream().findFirst().orElse(BuildResult.fail(1, "Build cancelado"));
         return summarize(req, result);
     }
 

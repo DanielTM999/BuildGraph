@@ -8,7 +8,7 @@ import java.util.Map;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TargetBuildState {
 
-    public static final int SCHEMA_VERSION = 3;
+    public static final int SCHEMA_VERSION = 4;
 
     private int schemaVersion = SCHEMA_VERSION;
     private String toolchainFingerprint = "";
@@ -71,6 +71,7 @@ public class TargetBuildState {
         private String sourceStamp = "";
         private String commandHash = "";
         private String objectFile = "";
+        private String objectStamp = "";
         private Map<String, String> headers = new LinkedHashMap<>();
 
         public String getSourceStamp() {
@@ -92,6 +93,9 @@ public class TargetBuildState {
         public String getObjectFile() {
             return objectFile;
         }
+
+        public String getObjectStamp() { return objectStamp; }
+        public void setObjectStamp(String value) { objectStamp = value == null ? "" : value; }
 
         public void setObjectFile(String objectFile) {
             this.objectFile = objectFile == null ? "" : objectFile;

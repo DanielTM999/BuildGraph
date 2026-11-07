@@ -12,11 +12,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
-/**
- * Executa os targets do grafo respeitando dependsOn. Targets independentes
- * rodam em paralelo (limitados por jobs); na primeira falha nenhum target
- * novo é iniciado (fail-fast), mas os que já estão rodando terminam.
- */
 public final class TargetScheduler {
 
     public record Result(Map<String, BuildResult> results, List<String> skipped, boolean success) {
@@ -40,6 +35,7 @@ public final class TargetScheduler {
         Map<String, BuildResult> results = new LinkedHashMap<>();
         boolean success = true;
         for (ResolvedTarget target : graph.topologicalOrder()) {
+            if (Thread.currentThread().isInterrupted()) success = false;
             if (!success) {
                 continue;
             }
@@ -75,7 +71,14 @@ public final class TargetScheduler {
                 }
             }
         } finally {
-            pool.shutdown();
+            boolean interrupted = Thread.interrupted();
+            if (interrupted) pool.shutdownNow();
+            else pool.shutdown();
+            while (!pool.isTerminated()) {
+                try { pool.awaitTermination(1, java.util.concurrent.TimeUnit.SECONDS); }
+                catch (InterruptedException e) { interrupted = true; pool.shutdownNow(); }
+            }
+            if (interrupted) Thread.currentThread().interrupt();
         }
 
         synchronized (lock) {
@@ -115,7 +118,7 @@ public final class TargetScheduler {
     private static BuildResult safeBuild(TargetBuilder builder, ResolvedTarget target) {
         try {
             return builder.build(target);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             return BuildResult.fail(1, "Falha inesperada no target '" + target.id() + "': " + e);
         }
     }

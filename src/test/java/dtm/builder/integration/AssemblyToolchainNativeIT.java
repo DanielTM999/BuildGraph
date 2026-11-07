@@ -12,7 +12,6 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-/** Optional real-tool checks; each absent backend is reported as skipped, never simulated. */
 class AssemblyToolchainNativeIT {
     @TempDir Path project;
     private Path tool(String key, String name) {

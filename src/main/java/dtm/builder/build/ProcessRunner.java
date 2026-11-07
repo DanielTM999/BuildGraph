@@ -36,23 +36,71 @@ public final class ProcessRunner {
             return COMMAND_NOT_FOUND;
         }
 
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                emit(output, line);
-            }
-        } catch (IOException e) {
-            emit(output, "Erro lendo saida do processo: " + e.getMessage());
-        }
+        ACTIVE.add(process);
+        Thread drain = Thread.ofVirtual().name("buildgraph-output").start(() -> {
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) emit(output, line);
+            } catch (IOException ignored) {
 
+            } catch (RuntimeException e) {
+                terminate(process);
+            }
+        });
         try {
-            return process.waitFor();
+            while (!process.waitFor(100, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                long resident = residentBytes(process.toHandle());
+                PEAK.set(Math.max(PEAK.get(), resident));
+            }
+            drain.join();
+            return process.exitValue();
         } catch (InterruptedException e) {
+            terminate(process);
             Thread.currentThread().interrupt();
-            process.destroy();
             return -1;
+        } finally {
+            if (process.isAlive()) terminate(process);
+            ACTIVE.remove(process);
+            try { process.getInputStream().close(); } catch (IOException ignored) { }
+            drain.interrupt();
+            boolean interrupted = Thread.interrupted();
+            try { drain.join(5000); } catch (InterruptedException e) { interrupted = true; }
+            if (interrupted) Thread.currentThread().interrupt();
         }
+    }
+
+    private static final java.util.Set<Process> ACTIVE = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private static final ThreadLocal<Long> PEAK = ThreadLocal.withInitial(() -> 0L);
+    static {
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> ACTIVE.forEach(ProcessRunner::terminate), "buildgraph-process-cleanup"));
+    }
+    public static void beginMemoryTracking() { PEAK.set(0L); }
+    public static long peakMemoryBytes() { return PEAK.get(); }
+
+    private static void terminate(Process process) {
+        var children = process.descendants().toList();
+        children.reversed().forEach(child -> { if (child.isAlive()) child.destroyForcibly(); });
+        process.destroyForcibly();
+        try { process.getInputStream().close(); } catch (IOException ignored) { }
+        boolean interrupted = Thread.interrupted();
+        try { process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS); }
+        catch (InterruptedException e) { interrupted = true; }
+        if (interrupted) Thread.currentThread().interrupt();
+    }
+
+    private static long residentBytes(ProcessHandle process) {
+        if (ToolProbe.isWindows()) return 0;
+        long total = rss(process.pid());
+        for (ProcessHandle child : process.descendants().toList()) total += rss(child.pid());
+        return total;
+    }
+    private static long rss(long pid) {
+        try {
+            for (String line : java.nio.file.Files.readAllLines(Path.of("/proc", Long.toString(pid), "status")))
+                if (line.startsWith("VmRSS:")) return Long.parseLong(line.replaceAll("[^0-9]", "")) * 1024;
+        } catch (IOException | NumberFormatException ignored) { }
+        return 0;
     }
 
     private static void emit(Consumer<String> output, String line) {

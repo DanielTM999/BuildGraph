@@ -102,7 +102,7 @@ public final class CompileCommandBuilder {
         if (compileOnly) {
             cmd.add("-c");
             if (spec.depFile() != null) {
-                cmd.add("-MMD");
+                cmd.add("-MD");
                 cmd.add("-MP");
                 cmd.add("-MF");
                 cmd.add(spec.depFile().toString());

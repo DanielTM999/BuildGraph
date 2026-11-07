@@ -36,6 +36,7 @@ class NativeBuildTest {
                 }
                 Path depTarget = cmd.contains("-MQ") ? Path.of(cmd.get(cmd.indexOf("-MQ") + 1)) : output;
                 for (String flag : List.of("-MF", "-MD", "--MD")) if (cmd.contains(flag)) {
+                    if (flag.equals("-MD") && cmd.contains("-MF")) continue;
                     Path dep = Path.of(cmd.get(cmd.indexOf(flag) + 1));
                     StringBuilder body = new StringBuilder(escape(depTarget) + ":");
                     for (String arg : cmd) {

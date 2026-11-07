@@ -4,7 +4,6 @@ import dtm.builder.manifest.model.ManifestRootModel;
 import java.nio.file.Path;
 import java.util.Locale;
 
-/** Resolves only tools needed by a selected action; never substitutes a native tool for a cross tool. */
 public final class NativeTools {
     private NativeTools() { }
     public record Tool(Path executable, String kind) { }
@@ -108,7 +107,7 @@ public final class NativeTools {
                 java.util.regex.Pattern.CASE_INSENSITIVE).matcher(text);
         if (!matcher.find()) throw new IllegalArgumentException("GNU assembler nao informou seu destino: " + tool.executable());
         String triple = matcher.group(1);
-        // Tool triples such as avr and xtensa-esp32-elf are valid even without an OS component.
+
         String architecture = triple.split("-")[0];
         TargetPlatform actual = TargetPlatform.resolve(architecture + "-none-elf", null);
         if (!actual.arch().equals(requested.arch()) && !(actual.x86() && requested.x86()))

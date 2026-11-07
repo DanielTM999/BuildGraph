@@ -117,7 +117,6 @@ public final class GlobalRepository {
         return resolveVariant(pkg, null).found();
     }
 
-    /** Versoes instaladas, da maior para a menor; empates respeitam a ordem dos repositorios. */
     public List<String> availableVersions(String id) {
         LinkedHashMap<String, PackageVersion> versions = new LinkedHashMap<>();
         for (Path root : roots) {
@@ -131,7 +130,7 @@ public final class GlobalRepository {
                     try {
                         versions.putIfAbsent(value, PackageVersion.parse(value));
                     } catch (IllegalArgumentException ignored) {
-                        // Diretorios que nao representam versoes nao participam da resolucao.
+
                     }
                 }
             } catch (IOException ignored) {

@@ -19,8 +19,8 @@ class LibrariesCleanerTest {
 
     @Test
     void removesManagedOrphanButKeepsForeignAndKept() throws Exception {
-        managed("libfoo");           // gerenciado, sera removido (nao esta no keep)
-        managed("libbar");           // gerenciado, mas esta no keep -> preservado
+        managed("libfoo");
+        managed("libbar");
         Path foreign = packagesDir.resolve("nao-gerenciado");
         Files.createDirectories(foreign);
         Files.writeString(foreign.resolve("data.txt"), "keep me");

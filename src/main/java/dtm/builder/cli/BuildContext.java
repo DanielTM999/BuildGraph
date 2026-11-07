@@ -53,6 +53,7 @@ public final class BuildContext {
     private final java.util.List<String> onlyTargets;
     private final String testMainOverride;
     private final boolean incremental;
+    private final dtm.builder.build.BuildOptions options;
     private final boolean skipTests;
     private final java.util.List<String> skippedTests;
 
@@ -98,6 +99,17 @@ public final class BuildContext {
                         int jobs, java.util.List<String> onlyTargets, String testMainOverride,
                         boolean incremental, String cCompilerOverride, String cxxCompilerOverride,
                         boolean skipTests, java.util.List<String> skippedTests) {
+        this(projectPath, repoOverride, profileOverride, compilerOverride, packagesOverride, printer,
+                jobs, onlyTargets, testMainOverride, incremental, cCompilerOverride, cxxCompilerOverride,
+                skipTests, skippedTests, dtm.builder.build.BuildOptions.defaults());
+    }
+
+    public BuildContext(Path projectPath, String repoOverride, String profileOverride,
+                        String compilerOverride, String packagesOverride, Printer printer,
+                        int jobs, java.util.List<String> onlyTargets, String testMainOverride,
+                        boolean incremental, String cCompilerOverride, String cxxCompilerOverride,
+                        boolean skipTests, java.util.List<String> skippedTests, dtm.builder.build.BuildOptions options) {
+        this.options = options;
         this.cCompilerOverride = cCompilerOverride;
         this.cxxCompilerOverride = cxxCompilerOverride;
         this.projectPath = ProjectManifestFiles.normalizeRoot(projectPath);
@@ -270,7 +282,7 @@ public final class BuildContext {
         LifecycleContext ctx = new LifecycleContext(projectPath, effective, toolchain, buildSystem,
                 configuration.repository(), packagesDir, buildDir, buildMode, placeholders,
                 buildOutput(), line -> printer.println(Severity.INFO, "{}", line),
-                jobs, selectedTargets, incremental);
+                jobs, selectedTargets, incremental, null, options);
 
         LifecycleResult result = LifecycleExecutor.run(ctx, phases);
 

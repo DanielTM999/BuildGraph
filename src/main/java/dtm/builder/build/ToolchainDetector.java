@@ -54,10 +54,6 @@ public final class ToolchainDetector {
         return all.isEmpty() ? null : all.get(0);
     }
 
-    /**
-     * Localiza o archiver para targets static: llvm-ar/ar ao lado do driver,
-     * depois no PATH; lib.exe para MSVC. Retorna null quando indisponível.
-     */
     public static Path resolveArchiver(Toolchain toolchain) {
         if (toolchain == null) {
             return null;

@@ -5,11 +5,6 @@ import dtm.builder.build.TargetType;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Target com todas as listas já compostas (raiz -> profile -> target ->
- * override do profile), pronto para o build. Em modo legado existe um
- * único target sintético derivado de 'library'/'name'.
- */
 public record ResolvedTarget(
         String id,
         String name,

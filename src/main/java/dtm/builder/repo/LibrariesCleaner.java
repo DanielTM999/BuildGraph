@@ -32,8 +32,7 @@ public final class LibrariesCleaner {
                 if (keep.contains(name)) {
                     continue;
                 }
-                // Nunca remove conteudo alheio: apenas temporarios interrompidos
-                // e pastas de fato materializadas pelo BuildGraph (com lock proprio).
+
                 boolean orphan = name.startsWith(".tmp-") || isManagedByBuildGraph(child);
                 if (!orphan) {
                     continue;

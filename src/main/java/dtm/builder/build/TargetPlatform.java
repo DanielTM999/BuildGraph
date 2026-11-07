@@ -3,7 +3,6 @@ package dtm.builder.build;
 import java.util.Locale;
 import java.util.function.Consumer;
 
-/** Destination information, independent of the OS running BuildGraph. */
 public record TargetPlatform(String arch, String os, String triple) {
     public static TargetPlatform host() {
         String arch = architecture(System.getProperty("os.arch", "unknown"));
@@ -28,7 +27,7 @@ public record TargetPlatform(String arch, String os, String triple) {
             return new TargetPlatform(arch, os, triple);
         }
         String arch = architecture(parts[0]);
-        // Triples keep an open architecture vocabulary: the selected tool validates support.
+
         if (parts.length >= 2 && value.matches("[a-z0-9_]+(?:-[a-z0-9_.]+)+")) {
             String os = value.contains("mingw") || value.contains("windows") || value.contains("win32")
                     ? "windows" : value.contains("darwin") || value.contains("apple") || value.contains("macos")

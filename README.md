@@ -35,6 +35,16 @@ Depois de extrair:
 - Linux: execute `BuildGraph/bin/BuildGraph`.
 - macOS: execute `BuildGraph.app/Contents/MacOS/BuildGraph`.
 
+No Windows, o launcher nativo usa `BuildGraph.ico` como ícone do executável, inclusive no
+Gerenciador de Tarefas. No Linux, usa `BuildGraph.png`. No macOS, o workflow gera um `.icns`
+a partir desse PNG com `sips` e `iconutil`, incluindo as resoluções Retina.
+O empacotamento fica diretamente em
+[Package native applications](.github/workflows/package-native.yml), executado manualmente
+em Actions ou pelo push de uma tag `vX.Y.Z`.
+
+Execute `BuildGraph.exe` para usar essa identidade nativa. Ao iniciar com `java -jar`, o processo
+pertence ao executável do Java e usa o ícone desse executável.
+
 O uber JAR também pode ser usado diretamente, desde que o Java 25 ou superior esteja instalado:
 
 ```shell
@@ -48,9 +58,11 @@ buildgraph [projectPath] [clean] [build] [test] [install] [refresh] [lock]
            [--interactive] [-f raw|json|xml]
            [-p profile] [-c compiler]
            [--test-main arquivo]
-           [-t target] [-j jobs]
+           [-t target] [-j auto|jobs]
            [--repo caminho] [--packages caminho] [--compile-commands]
            [--no-incremental] [--skip-tests] [--skip-test arquivo]
+           [--memory-limit 8G] [--memory-per-job 768M] [--memory-reserve 512M]
+           [--cache-dir caminho] [--cache-size 5G] [--no-cache] [--profile-build]
 ```
 
 Se `projectPath` não for informado, o diretório atual será usado. Sem uma fase explícita,
@@ -77,31 +89,30 @@ BuildGraph executa `build`.
 | `--packages`, `--out` | Pasta local usada quando `packagesBase` não está configurado. |
 | `--compile-commands`, `--clangd` | Imprime um `compile_commands.json` resolvido no stdout e encerra. |
 | `-t`, `--target` | Limita build/package, clean, install e bibliotecas dos testes ao target e suas dependências. Repetível ou separado por vírgula. |
-| `-j`, `--jobs` | Limita o paralelismo entre targets (`-j 1` = serial). Default: número de CPUs. |
+| `-j`, `--jobs` | `auto` (default) ou limite global de compilações/links, limitado também pelas CPUs e pela RAM. `-j 1` = serial. |
+| `--memory-limit` | Teto de RAM estimada para processos de build (ex.: `8G`). |
+| `--memory-per-job` | Estimativa base por compilação (ex.: `768M`). |
+| `--memory-reserve` | Reserva para o SO; default: maior entre 512 MiB e 10% da RAM física. |
+| `--cache-dir`, `--cache-size` | Diretório dedicado e quota do cache de objetos (default: 5 GiB). |
+| `--no-cache` | Desabilita o cache compartilhado e preserva o incremental local. |
+| `--profile-build` | Emite métricas de performance no formato de saída selecionado. |
 | `--no-incremental` | Ignora o estado incremental, recompila todas as fontes e regrava o cache. |
 
 Exemplos:
 
 ```shell
-# Build do projeto no diretório atual
 BuildGraph build
 
-# Limpa e depois compila outro projeto
 BuildGraph ../meu-projeto clean build
 
-# Usa saída JSON para integração com outra ferramenta
 BuildGraph . build --format json
 
-# Usa um profile da CLI somente se activeProfile não existir no manifest
 BuildGraph . test --profile debug
 
-# Usa um repositório adicional
 BuildGraph . refresh --repo D:/buildgraph-repository
 
-# Atualiza explicitamente apenas o lock de dependências
 BuildGraph . lock
 
-# Força recompilação completa sem apagar outros arquivos do outputDir
 BuildGraph . build --no-incremental
 ```
 
@@ -119,26 +130,102 @@ executados em paralelo.
 Builds diretos por manifest ou descoberta automática são incrementais por padrão. O estado fica em
 `<outputDir>/.buildgraph-state`: cada objeto é invalidado quando mudam o conteúdo da fonte ou de
 um header, o comando de compilação, o modo de build ou a toolchain. GCC/Clang geram dependências
-com `-MMD -MF`; MSVC usa `/showIncludes`; NASM roda uma passada `-M -MF` separada, porque o
+com `-MD -MF`, incluindo headers do sistema; MSVC usa `/showIncludes`; NASM roda uma passada `-M -MF` separada, porque o
 `-MD` do NASM 2.16 omite arquivos de `%include`. O link/archive só é repetido quando os objetos, uma
 biblioteca dependente ou o comando de link mudam. `clean` remove também esse estado.
 
 ```shell
-# Primeiro build: compila e linka normalmente
 BuildGraph . build
 
-# Sem mudanças: reutiliza objetos e artefato
 BuildGraph . build
 
-# Ignora o estado nesta execução, recompila tudo e grava um estado novo
 BuildGraph . build --no-incremental
 
-# Remove outputDir, incluindo objetos e estado incremental, antes do build
 BuildGraph . clean build
 ```
 
 CMake, Meson e Make continuam responsáveis pela própria incrementalidade; `--no-incremental`
 controla somente a compilação direta executada pelo BuildGraph.
+
+### Paralelismo, memória e cache compartilhado
+
+Todas as fontes de um target podem compilar simultaneamente. Uma fila global FIFO e um único
+pool de compilação atendem os targets prontos; compilações, pré-processamento e links compartilham
+o orçamento. O link de um target espera suas fontes e suas dependências. A submissão por target
+é limitada a uma janela de duas vezes o número de workers, evitando enfileirar milhares de closures.
+Falhas cancelam unidades pendentes e interrompem processos em execução; o estado só é salvo depois
+da barreira dos workers. Builds/clean concorrentes do mesmo outputDir são serializados por lock de
+arquivo; diretórios diferentes continuam independentes.
+
+```powershell
+java -jar BuildGraph.jar . build -j auto --profile-build
+java -jar BuildGraph.jar . build -j 12 --memory-limit 8G --memory-per-job 768M
+java -jar BuildGraph.jar . clean build --cache-dir D:/cache/buildgraph --cache-size 10G
+java -jar BuildGraph.jar . build --no-incremental --no-cache
+```
+
+O modo automático usa as CPUs visíveis à JVM, memória física disponível e reserva do sistema.
+O teto do usuário pode reduzir o orçamento automático. A base conservadora é 256 MiB para C/ASM
+e 768 MiB para C++; fontes grandes e picos de RSS observados por unidade podem aumentá-la.
+Linux amostra RSS da árvore de processos por `/proc` e persiste os picos; Windows usa as estimativas
+conservadoras, pois Java não oferece RSS portátil. Sem métricas confiáveis, a admissão fica serial.
+A fila não pula unidades grandes: uma unidade maior que o orçamento executa sozinha para permitir
+progresso. Estes limites controlam admissão e estimativas; não são limites rígidos impostos pelo SO.
+`--memory-reserve` permite ajustar explicitamente a reserva quando necessário. `K`, `M`, `G`, `T`,
+`MiB` e `GiB` usam múltiplos binários; valores inválidos ou com overflow são rejeitados.
+
+O cache compartilhado fica separado de `<outputDir>/.buildgraph-state`. Por padrão usa
+`%LOCALAPPDATA%/BuildGraph/cache/objects-v1` no Windows e
+`${XDG_CACHE_HOME:-~/.cache}/buildgraph/objects-v1` no Linux. `clean` não o remove.
+O fluxo é incremental local → cache compartilhado → compilador → atualização do estado.
+`--no-incremental` força compilação real e pode alimentar o cache; `--no-cache` desativa somente o
+cache compartilhado. A primeira execução após uma atualização do schema incremental pode recompilar.
+
+Para GCC/Clang, a chave inclui fonte e headers transitivos por conteúdo, saída pré-processada,
+comando, arquitetura/ABI, identidade/versão da toolchain (incluindo componentes GCC), ambiente
+relevante e caminhos. O miss compila a mesma entrada pré-processada usada para a chave. Isso também
+resolve includes condicionais, arquivos gerados e novos headers que sombreiam outros includes.
+Variáveis de busca de ferramentas/includes, SDK, locale, reprodução e opções de compilador entram
+na assinatura; todas as variáveis explícitas de `env` também entram. Metadados de invocação sem
+relação com o compilador não invalidam objetos de drivers conhecidos. Para drivers personalizados,
+todo o ambiente herdado entra na assinatura. Arquivos editados com tamanho/mtime preservados
+são detectados por conteúdo em cada build; os hashes são compartilhados apenas durante a execução.
+Os objetos locais também têm integridade verificada. Builds sem mudanças não regravam o estado.
+
+Caminhos de debug, `__FILE__` e builtins de localização são preservados. Diretórios distintos
+normalmente geram misses seguros. Para compartilhar checkouts equivalentes com o mesmo layout,
+configure `-ffile-prefix-map=<raiz-absoluta>=.` em cada checkout. Só esse mapeamento completo permite
+a normalização dos caminhos da raiz na chave; caminhos externos e conteúdo expandido continuam
+sendo comparados. Sem isso não se presume que objetos com caminhos distintos sejam equivalentes.
+
+As entradas são imutáveis, distribuídas por hash, verificadas com SHA-256 e publicadas/restauradas
+por rename atômico. Corrupção, falta de permissão ou filesystem sem rename atômico causam miss.
+Uma varredura LRU por build que efetivamente usa o cache aplica a quota, com lock entre processos;
+pode haver excesso temporário durante gravações concorrentes. Consultas individuais não varrem o cache.
+O diretório configurado deve ser dedicado ao cache de objetos.
+
+O cache prefere um miss seguro a uma reutilização incerta: MSVC (incluindo PDB), assembly autônomo,
+Objective-C, módulos, PCH explícito, plugins, sanitizers, LTO e flags não reconhecidas continuam no
+caminho normal. Módulos/PCH que compartilham saídas mantêm execução serial e a ordem anterior.
+Diretivas de assembly inline e strings de assembly ambíguas usam snapshot sem cache e dependências
+incrementais conservadoras, pois podem ler arquivos não reportados pelo pré-processador.
+O paralelismo C/C++ normal e a CLI/manifests existentes continuam disponíveis.
+
+Nomes de objetos são hashes estáveis do caminho da fonte, com tamanho limitado. Inserir fontes
+na lista não renomeia os objetos existentes. Comandos longos de GCC/Clang, binutils e MSVC usam
+response files temporários, com quoting próprio e UTF-16LE para MSVC, permitindo linkar milhares
+de objetos também no Windows.
+
+Com `--profile-build`, as linhas `[profile]` informam `discovery_ns`, `analysis_ns`, `dependencies_ns`,
+`incremental_ns`, `shared_cache_ns`, `compile_ns`, `link_ns`, `unit_total_ns`, `queue_wait_ns`,
+`worker_wait_ns`, `memory_wait_ns`, `compiled`, `local_reused`, `cache_hits`, `cache_misses`,
+`cache_bypassed`, `workers`, `memory_budget_bytes` e `max_compilations`. Contadores ausentes valem zero.
+Tempos são nanossegundos somados entre workers; etapas aninhadas se sobrepõem e não devem ser somadas
+como tempo total de parede. `max_compilations` mede unidades em execução, inclusive preparação/restore.
+Sem profiling não são criados contadores por evento nem consultados relógios para esses timers.
+
+Os testes `ObjectCacheNativeIT` verificam rebuild após clean em fixtures temporárias e executam os
+binários restaurados. `LargeProjectNativeIT` compila 1.001 unidades C e executa o binário final.
 
 ## Modo interativo
 
@@ -193,7 +280,7 @@ Exemplo de ciclo incremental dentro da sessão:
 ```
 
 O segundo `build` reutiliza os resultados do primeiro quando não houve mudanças. `clean build`
-força um rebuild ao remover o diretório de saída e seu estado incremental.
+remove o diretório de saída e seu estado incremental; objetos compatíveis podem vir do cache compartilhado.
 
 Linhas vazias são ignoradas. Um comando desconhecido gera um aviso e mantém a sessão aberta.
 
@@ -618,10 +705,8 @@ arquivo é sempre JSON, mesmo quando o projeto usa `Manifest.xml`, e deve ser ve
 projeto.
 
 ```shell
-# Resolve e grava o lock, sem alterar a pasta local de packages
 BuildGraph . lock
 
-# Resolve, atualiza o lock e materializa packages
 BuildGraph . refresh
 ```
 

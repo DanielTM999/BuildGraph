@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/** Comparador de versoes semanticas tolerante a segmentos ausentes (1 == 1.0.0). */
 public final class PackageVersion implements Comparable<PackageVersion> {
 
     private final String value;

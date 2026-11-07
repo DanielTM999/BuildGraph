@@ -11,7 +11,6 @@ public final class DepFileParser {
     private DepFileParser() {
     }
 
-    /** Dependencias do primeiro alvo de um .d estilo Make; null se ilegivel. */
     public static List<Path> parseSafe(Path depFile) {
         return parseSafe(depFile, null);
     }
@@ -48,13 +47,12 @@ public final class DepFileParser {
             for (String token : tokenize(line.substring(sep + 1))) {
                 deps.add(Path.of(token));
             }
-            // a primeira regra e a real; as demais sao alvos phony gerados por -MP
+
             break;
         }
         return deps;
     }
 
-    /** Primeiro ':' seguido de whitespace ou fim; drive letters ("C:\") nao separam. */
     private static int targetSeparator(String line) {
         for (int i = 0; i < line.length(); i++) {
             if (line.charAt(i) != ':') {

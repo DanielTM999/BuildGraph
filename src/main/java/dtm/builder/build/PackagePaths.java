@@ -30,7 +30,6 @@ public final class PackagePaths {
         return linkLibraries;
     }
 
-    /** Arquivos de packages que podem ser selecionados pelo linker. */
     public List<Path> linkInputFiles() {
         return linkInputFiles;
     }

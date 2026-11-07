@@ -3,7 +3,6 @@ package dtm.builder.build;
 import dtm.builder.build.graph.ResolvedTarget;
 import dtm.builder.build.graph.TargetGraph;
 import dtm.builder.build.graph.TargetResolver;
-import dtm.builder.build.incremental.CompilerFingerprint;
 import dtm.builder.build.incremental.DepFileParser;
 import dtm.builder.build.incremental.IncrementalBuildService;
 import dtm.builder.build.incremental.MsvcIncludeParser;
@@ -20,7 +19,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
-/** Builds one target with a compiler/assembler chosen independently for every source. */
 public final class NativeTargetBuilder {
     private NativeTargetBuilder() { }
 
@@ -32,14 +30,26 @@ public final class NativeTargetBuilder {
     public static BuildResult build(BuildRequest req, ResolvedTarget target, TargetGraph graph,
                                     Consumer<String> out, java.util.function.BiConsumer<String, Long> progress) {
         try {
-            return execute(req, target, graph, out, progress);
+            try (BuildRuntime runtime = new BuildRuntime(req)) {
+                return execute(req, target, graph, runtime.serialize(out), runtime.serialize(progress), runtime);
+            }
         } catch (IOException | IllegalArgumentException e) {
             return BuildResult.fail(1, "Target '" + target.id() + "': " + e.getMessage());
         }
     }
 
+    static BuildResult build(BuildRequest req, ResolvedTarget target, TargetGraph graph,
+                             Consumer<String> out, java.util.function.BiConsumer<String, Long> progress,
+                             BuildRuntime runtime) {
+        try { return execute(req, target, graph, runtime.serialize(out), runtime.serialize(progress), runtime); }
+        catch (IOException | IllegalArgumentException e) {
+            return BuildResult.fail(1, "Target '" + target.id() + "': " + e.getMessage());
+        }
+    }
+
     private static BuildResult execute(BuildRequest req, ResolvedTarget target, TargetGraph graph,
-                                        Consumer<String> out, java.util.function.BiConsumer<String, Long> progress) throws IOException {
+                                        Consumer<String> out, java.util.function.BiConsumer<String, Long> progress, BuildRuntime runtime) throws IOException {
+        long analysisStarted = runtime.metrics.start();
         NativeArtifacts.requireId(target.id());
         ManifestRootModel m = TargetResolver.perTargetManifest(req.manifest(), target);
         boolean[] invalidPlatform = {false};
@@ -47,11 +57,15 @@ public final class NativeTargetBuilder {
             invalidPlatform[0] = true;
             out.accept(message);
         });
-        // Preserve compiler-native ABI defaults unless a platform was explicitly requested.
+
         if (invalidPlatform[0] || "native".equalsIgnoreCase(m.getPlatform())) m.setPlatform(null);
         else if (NativeTools.specified(m.getPlatform())) m.setPlatform(platform.triple());
-        List<Path> sources = SourceCollector.collectSources(req.projectPath(), target.sources(), target.synthetic());
+        List<Path> sources = runtime.sources(target);
         if (sources.isEmpty()) throw new IllegalArgumentException("Nenhuma fonte C/C++/ASM encontrada");
+        boolean exclusiveUnits = sources.stream().anyMatch(source -> source.toString().matches("(?i).*\\.(cppm|ixx|mpp|ccm|cxxm)$"))
+                || m.getCompileFlags().stream().map(flag -> flag.toLowerCase(java.util.Locale.ROOT))
+                .anyMatch(flag -> flag.contains("module") || flag.contains("pch") || flag.startsWith("/yc")
+                        || flag.startsWith("/yu") || flag.startsWith("/fp"));
         boolean flat = target.type() == TargetType.BINARY && "bin".equals(AssemblyCommandBuilder.format(m, platform));
         if ((flat || target.type() == TargetType.OBJECT) && sources.size() != 1)
             throw new IllegalArgumentException("type object ou NASM bin direto requer uma unica fonte principal");
@@ -66,7 +80,7 @@ public final class NativeTargetBuilder {
         boolean cpp = SourceCollector.isCppSources(sources);
         boolean c = sources.stream().anyMatch(s -> !SourceCollector.isAssembly(s));
         for (ResolvedTarget dep : usageDependencies(graph, target)) {
-            List<Path> depSources = SourceCollector.collectSources(req.projectPath(), dep.sources(), dep.synthetic());
+            List<Path> depSources = runtime.sources(dep);
             cpp |= SourceCollector.isCppSources(depSources);
             c |= depSources.stream().anyMatch(s -> !SourceCollector.isAssembly(s));
             ManifestRootModel dm = TargetResolver.perTargetManifest(req.manifest(), dep);
@@ -108,85 +122,102 @@ public final class NativeTargetBuilder {
             if (name.equals("ar") || name.endsWith("-ar")) archiveMsvc = false;
             if (name.equals("lib") || name.endsWith("-lib")) archiveMsvc = true;
         }
+        PackagePaths packages = runtime.packages();
         StringBuilder fingerprint = new StringBuilder("|" + platform + "|" + AssemblyCommandBuilder.format(m, platform));
-        for (NativeTools.Tool tool : assemblers.values()) fingerprint.append('|').append(tool.kind()).append(CompilerFingerprint.describe(tool.executable()));
-        if (linker != null) fingerprint.append(CompilerFingerprint.describe(linker.executable()));
-        fingerprint.append(CompilerFingerprint.describe(archive)).append(CompilerFingerprint.describe(objcopy));
-        IncrementalBuildService incremental = new IncrementalBuildService(req.buildDir(), compiler, req.buildMode(), req.incremental(), fingerprint.toString());
+        for (NativeTools.Tool tool : new LinkedHashSet<>(assemblers.values())) fingerprint.append('|').append(tool.kind()).append(runtime.toolFingerprint(tool.executable()));
+        if (linker != null) fingerprint.append(runtime.toolFingerprint(linker.executable()));
+        fingerprint.append(runtime.toolFingerprint(archive)).append(runtime.toolFingerprint(objcopy));
+        fingerprint.append(runtime.compilerFingerprint(compiler, m));
+        String environment = runtime.environment(m.getEnv(), compiler);
+        IncrementalBuildService incremental = new IncrementalBuildService(req.buildDir(), compiler, req.buildMode(), req.incremental(), fingerprint + "|env=" + environment + "|includes=" + runtime.includeNamespace(m, sources, packages.includeDirs()), runtime.hasher);
         TargetState state = incremental.begin(target.id());
+        runtime.metrics.elapsed("analysis", analysisStarted);
         List<Path> owned = new ArrayList<>(List.of(artifact));
         if (nativeMsvc && finalLink && objcopy == null) owned.add(artifact.resolveSibling(artifact.getFileName() + ".pdb"));
         if (nativeMsvc && target.type() == TargetType.SHARED) {
             owned.add(importLibrary(artifact));
             owned.add(artifact.resolveSibling(artifact.getFileName().toString().replaceFirst("(?i)\\.dll$", "") + ".exp"));
         }
-        // Register before starting processes so selective clean also handles failed builds.
+
         NativeArtifacts.record(req.buildDir(), target.id(), owned);
-        PackagePaths packages = PackagePaths.resolve(req.packagesDir());
         try {
             List<Path> objects = new ArrayList<>();
-            int index = 0;
-            for (Path source : sources) {
-                Path object = flat || target.type() == TargetType.OBJECT ? artifact
-                        : objDir.resolve(index++ + "_" + source.getFileName() + (platform.windows() ? ".obj" : ".o"));
-                objects.add(object);
-                Path depFile = objDir.resolve(object.getFileName() + ".d");
-                Path ppDep = objDir.resolve(object.getFileName() + ".cpp.d");
-                List<String> preprocess = List.of();
-                List<String> dependencyScan = List.of();
-                List<String> command;
-                NativeTools.Tool asm = assemblers.get(source);
-                if (asm != null) {
-                    Path asmSource = source;
-                    if (SourceCollector.needsPreprocessor(source)) {
-                        asmSource = objDir.resolve(object.getFileName() + ".s");
-                        preprocess = AssemblyCommandBuilder.preprocess(compiler, m, req.projectPath(), source, asmSource, ppDep, packages.includeDirs());
+            List<java.util.concurrent.CompletableFuture<BuildResult>> pending = new ArrayList<>();
+            boolean drained = false;
+            try {
+                for (Path source : sources) {
+                    Path object = flat || target.type() == TargetType.OBJECT ? artifact
+                            : objDir.resolve(NativeArtifacts.objectFileName(req.projectPath(), source, platform.windows()));
+                    objects.add(object);
+                    Path depFile = objDir.resolve(object.getFileName() + ".d");
+                    Path ppDep = objDir.resolve(object.getFileName() + ".cpp.d");
+                    List<String> preprocess = List.of();
+                    List<String> dependencyScan = List.of();
+                    List<String> command;
+                    NativeTools.Tool asm = assemblers.get(source);
+                    if (asm != null) {
+                        Path asmSource = source;
+                        if (SourceCollector.needsPreprocessor(source)) {
+                            asmSource = objDir.resolve(object.getFileName() + ".s");
+                            preprocess = AssemblyCommandBuilder.preprocess(compiler, m, req.projectPath(), source, asmSource, ppDep, packages.includeDirs());
+                        }
+                        command = AssemblyCommandBuilder.build(asm, platform, m, req.projectPath(), asmSource, object, depFile, packages.includeDirs(), !preprocess.isEmpty());
+                        if (asm.kind().equals("nasm"))
+                            dependencyScan = AssemblyCommandBuilder.nasmDependencies(asm, platform, m, req.projectPath(), asmSource, object, depFile, packages.includeDirs());
+                    } else {
+                        CompileSpec spec = new CompileSpec(compiler, SourceCollector.isCppSources(List.of(source)), m,
+                                target.type() == TargetType.SHARED, List.of(source), object, packages.includeDirs(),
+                                List.of(), List.of(), req.buildMode(), List.of(), req.projectPath(), depFile);
+                        command = CompileCommandBuilder.buildCompileOnlyCommand(spec);
                     }
-                    command = AssemblyCommandBuilder.build(asm, platform, m, req.projectPath(), asmSource, object, depFile, packages.includeDirs(), !preprocess.isEmpty());
-                    if (asm.kind().equals("nasm"))
-                        dependencyScan = AssemblyCommandBuilder.nasmDependencies(asm, platform, m, req.projectPath(), asmSource, object, depFile, packages.includeDirs());
-                } else {
-                    CompileSpec spec = new CompileSpec(compiler, SourceCollector.isCppSources(List.of(source)), m,
-                            target.type() == TargetType.SHARED, List.of(source), object, packages.includeDirs(),
-                            List.of(), List.of(), req.buildMode(), List.of(), req.projectPath(), depFile);
-                    command = CompileCommandBuilder.buildCompileOnlyCommand(spec);
+                    List<String> signature = new ArrayList<>(preprocess);
+                    signature.addAll(command);
+                    signature.addAll(dependencyScan);
+                    long checked = runtime.metrics.start();
+                    boolean upToDate = incremental.isObjectUpToDate(state, source, object, signature);
+                    runtime.metrics.elapsed("incremental", checked);
+                    if (upToDate) {
+                        runtime.metrics.add("local_reused", 1);
+                        progress.accept("Sem mudancas: " + source.getFileName(), 0L);
+                        continue;
+                    }
+                    final ManifestRootModel unitManifest = m;
+                    final List<String> unitPreprocess = preprocess, unitDependencyScan = dependencyScan;
+                    long estimate = exclusiveUnits ? Long.MAX_VALUE : ResourceManager.estimate(source, req.options().memoryPerJob(),
+                            runtime.history.peak(dtm.builder.build.incremental.FileHasher.hashCommand(signature)));
+                    pending.add(runtime.scheduler.submit(estimate, true,
+                            () -> {
+                                try {
+                                    BuildResult result = compileUnit(req, unitManifest, platform, flat, msvc, asm, source, object, depFile, ppDep,
+                                        unitPreprocess, unitDependencyScan, command, signature, incremental, state, out, progress, runtime, environment);
+                                    if (!result.success()) runtime.scheduler.cancel();
+                                    return result;
+                                } catch (Exception e) { runtime.scheduler.cancel(); throw e; }
+                            }));
+
+                    if (pending.size() >= runtime.scheduler.workers() * 2) {
+                        BuildResult result = await(pending.removeFirst(), runtime);
+                        if (!result.success()) return result;
+                    }
                 }
-                List<String> signature = new ArrayList<>(preprocess);
-                signature.addAll(command);
-                signature.addAll(dependencyScan);
-                if (incremental.isObjectUpToDate(state, source, object, signature)) {
-                    progress.accept("Sem mudancas: " + source.getFileName(), 0L);
-                    continue;
+                for (var future : pending) {
+                    BuildResult result = await(future, runtime);
+                    if (!result.success()) return result;
                 }
-                long started = System.nanoTime();
-                Files.deleteIfExists(depFile);
-                if (!preprocess.isEmpty()) {
-                    Files.deleteIfExists(ppDep);
-                    int exit = run(req, m, preprocess, out);
-                    if (exit != 0) return BuildResult.fail(exit, "Pre-processamento falhou: " + source);
+                drained = true;
+            } finally {
+                if (!drained) runtime.scheduler.cancel();
+
+                boolean interrupted = Thread.interrupted();
+                for (var future : pending) {
+                    boolean done = false;
+                    while (!done) {
+                        try { future.get(); done = true; }
+                        catch (InterruptedException e) { interrupted = true; runtime.scheduler.cancel(); }
+                        catch (java.util.concurrent.ExecutionException | java.util.concurrent.CancellationException e) { done = true; }
+                    }
                 }
-                MsvcIncludeParser includes = asm == null && msvc ? new MsvcIncludeParser() : null;
-                Consumer<String> compileOut = includes == null ? out : line -> { if (!includes.offer(line)) out.accept(line); };
-                int exit = run(req, m, command, compileOut);
-                if (exit != 0) {
-                    Files.deleteIfExists(object);
-                    return BuildResult.fail(exit, "Compilacao/montagem falhou: " + source);
-                }
-                if (!Files.isRegularFile(object)) return BuildResult.fail(1, "Ferramenta nao gerou " + object);
-                if (!flat && req.executor() == ProcessExecutor.REAL) {
-                    try { ObjectFormatValidator.validate(object, platform); }
-                    catch (IOException e) { Files.deleteIfExists(object); throw e; }
-                }
-                if (!dependencyScan.isEmpty() && run(req, m, dependencyScan, out) != 0) Files.deleteIfExists(depFile);
-                List<Path> deps = includes != null ? includes.prefix() == null ? null : includes.includes()
-                        : asm != null && asm.kind().equals("masm") ? null : DepFileParser.parseSafe(depFile, req.projectPath());
-                if (!preprocess.isEmpty() && deps != null) {
-                    List<Path> ppDeps = DepFileParser.parseSafe(ppDep, req.projectPath());
-                    if (ppDeps == null) deps = null;
-                    else { deps = new ArrayList<>(deps); deps.addAll(ppDeps); }
-                }
-                incremental.recordCompiled(state, source, object, signature, deps);
-                progress.accept("Compilado " + source.getFileName(), started);
+                if (interrupted) Thread.currentThread().interrupt();
             }
             if (flat || target.type() == TargetType.OBJECT) return BuildResult.ok(0, artifact, "Artefato gerado: " + artifact);
 
@@ -217,17 +248,27 @@ public final class NativeTargetBuilder {
                     : List.of(objcopy.toString(), "-O", "binary", linkOutput.toString(), artifact.toString());
             List<String> signature = new ArrayList<>(command);
             signature.addAll(conversion);
-            if (!incremental.needsLink(state, signature, artifact, tracked)
+            long linkChecked = runtime.metrics.start();
+            boolean needsLink = incremental.needsLink(state, signature, artifact, tracked);
+            runtime.metrics.elapsed("incremental", linkChecked);
+            if (!needsLink
                     && (!nativeMsvc || target.type() != TargetType.SHARED || Files.isRegularFile(importLibrary(artifact)))
                     && (objcopy == null || Files.isRegularFile(linkOutput))) {
                 progress.accept("Artefato ja atualizado: " + artifact, 0L);
                 return BuildResult.ok(0, artifact, "Artefato atualizado: " + artifact);
             }
-            // ar replaces members but does not remove obsolete ones; rebuild archives from scratch.
+
             if (target.type() == TargetType.STATIC) Files.deleteIfExists(artifact);
             long started = System.nanoTime();
-            int exit = run(req, m, command, out);
-            if (exit == 0 && !conversion.isEmpty()) exit = run(req, m, conversion, out);
+            final ManifestRootModel linkManifest = m;
+            int exit = await(runtime.scheduler.submit(Math.max(256 * ResourceManager.MIB, resourcesForLink(objects)), false, () -> {
+                long linking = runtime.metrics.start();
+                try {
+                    int code = run(req, linkManifest, command, out);
+                    if (code == 0 && !conversion.isEmpty()) code = run(req, linkManifest, conversion, out);
+                    return code;
+                } finally { runtime.metrics.elapsed("link", linking); }
+            }), runtime, -1);
             if (exit != 0 || !Files.isRegularFile(artifact)) {
                 incremental.recordLinkFailed(state);
                 return BuildResult.fail(exit == 0 ? 1 : exit, "Link/archive/conversao falhou: " + artifact);
@@ -240,9 +281,131 @@ public final class NativeTargetBuilder {
         }
     }
 
-    private static int run(BuildRequest req, ManifestRootModel m, List<String> command, Consumer<String> out) {
+    private static BuildResult compileUnit(BuildRequest req, ManifestRootModel m, TargetPlatform platform,
+            boolean flat, boolean msvc, NativeTools.Tool asm, Path source, Path object, Path depFile, Path ppDep,
+            List<String> preprocess, List<String> dependencyScan, List<String> command, List<String> signature,
+            IncrementalBuildService incremental, TargetState state, Consumer<String> out,
+            java.util.function.BiConsumer<String, Long> progress, BuildRuntime runtime, String environment) throws IOException {
+        long compiling = runtime.metrics.start();
+        ProcessRunner.beginMemoryTracking();
+        dtm.builder.build.cache.PreprocessedObjectCache.Prepared cached = null;
+        try {
+            incremental.invalidateObject(state, source);
+            runtime.hasher.invalidate(object);
+            long started = System.nanoTime();
+            Files.deleteIfExists(depFile);
+            if (asm == null) {
+                long caching = runtime.metrics.start();
+                try {
+                    cached = runtime.cache.prepare(req, m, source, object, depFile, command, environment, runtime.metrics, out);
+                    if (cached != null && cached.key() != null && req.incremental()) {
+                        if (runtime.cache.restore(cached, object)) {
+                            if (!inputsStable(cached, source)) {
+                                Files.deleteIfExists(object);
+                                return BuildResult.fail(1, "Entrada alterada durante a compilacao: " + source);
+                            }
+                            incremental.recordCompiled(state, source, object, signature, cached.dependencies());
+                            runtime.metrics.add("cache_hits", 1);
+                            progress.accept("Cache compartilhado: " + source.getFileName(), started);
+                            return BuildResult.ok(0, object, "Objeto restaurado: " + source);
+                        }
+                        runtime.metrics.add("cache_misses", 1);
+                    }
+                } finally { runtime.metrics.elapsed("shared_cache", caching); }
+            }
+            if (Thread.currentThread().isInterrupted()) return BuildResult.fail(1, "Compilacao cancelada: " + source);
+            if (!preprocess.isEmpty()) {
+                Files.deleteIfExists(ppDep);
+                int exit = run(req, m, preprocess, out);
+                if (exit != 0) return BuildResult.fail(exit, "Pre-processamento falhou: " + source);
+            }
+            MsvcIncludeParser includes = asm == null && msvc ? new MsvcIncludeParser() : null;
+            Consumer<String> compileOut = includes == null ? out : line -> { if (!includes.offer(line)) out.accept(line); };
+            long execution = runtime.metrics.start();
+            int exit;
+            try { exit = run(req, m, cached == null ? command : cached.command(), compileOut); }
+            finally { runtime.metrics.elapsed("compile", execution); }
+            if (exit != 0 || Thread.currentThread().isInterrupted()) {
+                Files.deleteIfExists(object);
+                return BuildResult.fail(exit == 0 ? 1 : exit, "Compilacao/montagem falhou: " + source);
+            }
+            if (!Files.isRegularFile(object)) return BuildResult.fail(1, "Ferramenta nao gerou " + object);
+            if (!flat && req.executor() == ProcessExecutor.REAL) {
+                try { ObjectFormatValidator.validate(object, platform); }
+                catch (IOException e) { Files.deleteIfExists(object); throw e; }
+            }
+            long dependencies = runtime.metrics.start();
+            if (!dependencyScan.isEmpty() && run(req, m, dependencyScan, out) != 0) Files.deleteIfExists(depFile);
+            List<Path> deps = cached != null ? cached.dependencies() : includes != null ? includes.prefix() == null ? null : includes.includes()
+                    : asm != null && asm.kind().equals("masm") ? null : DepFileParser.parseSafe(depFile, req.projectPath());
+            if (!preprocess.isEmpty() && deps != null) {
+                List<Path> ppDeps = DepFileParser.parseSafe(ppDep, req.projectPath());
+                if (ppDeps == null) deps = null;
+                else { deps = new ArrayList<>(deps); deps.addAll(ppDeps); }
+            }
+            runtime.metrics.elapsed("dependencies", dependencies);
+            if (cached != null) {
+                if (!inputsStable(cached, source)) {
+                    Files.deleteIfExists(object);
+                    return BuildResult.fail(1, "Entrada alterada durante a compilacao: " + source);
+                }
+                long caching = runtime.metrics.start();
+                try { runtime.cache.store(cached, object); }
+                finally { runtime.metrics.elapsed("shared_cache", caching); }
+            }
+            incremental.recordCompiled(state, source, object, signature, cached != null && cached.key() == null ? null : deps);
+            progress.accept("Compilado " + source.getFileName(), started);
+            runtime.metrics.add("compiled", 1);
+            return BuildResult.ok(0, object, "Compilado " + source);
+        } finally {
+            if (cached != null) cached.close();
+            runtime.history.record(dtm.builder.build.incremental.FileHasher.hashCommand(signature), ProcessRunner.peakMemoryBytes());
+            runtime.metrics.elapsed("unit_total", compiling);
+        }
+    }
+
+    private static boolean inputsStable(dtm.builder.build.cache.PreprocessedObjectCache.Prepared input, Path source) throws IOException {
+        if (!new dtm.builder.build.incremental.FileHasher().sha256(source).equals(input.sourceHash())) return false;
+        for (Path dependency : input.dependencies())
+            if (Files.getLastModifiedTime(dependency).toMillis() > input.scanStartedMillis()) return false;
+        return true;
+    }
+
+    private static long resourcesForLink(List<Path> objects) {
+        long bytes = 0;
+        for (Path object : objects) try { bytes += Files.size(object); } catch (IOException ignored) { }
+        return Math.min(4L << 30, bytes * 3);
+    }
+
+    private static BuildResult await(java.util.concurrent.CompletableFuture<BuildResult> future, BuildRuntime runtime) {
+        return await(future.exceptionally(error -> BuildResult.fail(1, "Falha na unidade de compilacao: " + error)),
+                runtime, BuildResult.fail(1, "Compilacao cancelada ou falhou"));
+    }
+
+    private static <T> T await(java.util.concurrent.CompletableFuture<T> future, BuildRuntime runtime, T failure) {
+        try { return future.get(); }
+        catch (InterruptedException e) {
+            runtime.scheduler.cancel();
+            boolean done = false;
+            while (!done) {
+                try { future.get(); done = true; }
+                catch (InterruptedException again) { }
+                catch (java.util.concurrent.ExecutionException | java.util.concurrent.CancellationException failed) { done = true; }
+            }
+            Thread.currentThread().interrupt();
+            return failure;
+        }
+        catch (java.util.concurrent.ExecutionException | java.util.concurrent.CancellationException e) {
+            runtime.scheduler.cancel(); return failure;
+        }
+    }
+
+    private static int run(BuildRequest req, ManifestRootModel m, List<String> command, Consumer<String> out) throws IOException {
         out.accept("+ " + String.join(" ", command));
-        return req.executor().run(command, req.projectPath(), m.getEnv(), out);
+        if (req.executor() != ProcessExecutor.REAL) return req.executor().run(command, req.projectPath(), m.getEnv(), out);
+        try (ResponseFile response = ResponseFile.prepare(command, req.buildDir())) {
+            return req.executor().run(response.command(), req.projectPath(), m.getEnv(), out);
+        }
     }
 
     public static Path artifact(BuildRequest req, ResolvedTarget target, boolean msvc) {
@@ -253,7 +416,6 @@ public final class NativeTargetBuilder {
         return dll.resolveSibling(dll.getFileName().toString().replaceFirst("(?i)\\.dll$", "") + ".lib");
     }
 
-    /** Objects absorbed into a static archive must not also be linked individually downstream. */
     public static List<ResolvedTarget> linkDependencies(TargetGraph graph, ResolvedTarget target) {
         LinkedHashMap<String, ResolvedTarget> out = new LinkedHashMap<>();
         collect(graph, target, false, out, new java.util.HashSet<>());
@@ -267,7 +429,6 @@ public final class NativeTargetBuilder {
         return ordered.stream().filter(t -> out.containsKey(t.id())).toList();
     }
 
-    /** Includes/language requirements survive object absorption into a library. */
     private static List<ResolvedTarget> usageDependencies(TargetGraph graph, ResolvedTarget target) {
         Map<String, ResolvedTarget> found = new LinkedHashMap<>();
         java.util.ArrayDeque<String> pending = new java.util.ArrayDeque<>(target.dependsOn());

@@ -156,7 +156,6 @@ public final class UserArgs {
         return flag(COMPILE_COMMANDS);
     }
 
-    /** true desabilita o cache incremental (recompila tudo e regrava o estado). */
     public boolean hasNoIncremental() {
         return flag(NO_INCREMENTAL);
     }
@@ -191,7 +190,6 @@ public final class UserArgs {
         return !getTargets().isEmpty();
     }
 
-    /** 0 = default (paralelo com availableProcessors); 1 = serial. */
     public int getJobs() {
         String raw = argsMap.getOrDefault(JOBS, "");
         if (raw.isBlank()) {
@@ -206,6 +204,17 @@ public final class UserArgs {
 
     public Map<String, String> asMap() {
         return Collections.unmodifiableMap(argsMap);
+    }
+
+    public dtm.builder.build.BuildOptions getBuildOptions() {
+        var defaults = dtm.builder.build.BuildOptions.defaults();
+        return new dtm.builder.build.BuildOptions(size("--memory-limit", 0), size("--memory-per-job", 0),
+                argsMap.containsKey("--cache-dir") ? java.nio.file.Path.of(argsMap.get("--cache-dir")) : defaults.cacheDirectory(),
+                size("--cache-size", defaults.cacheSize()), !flag("--no-cache"), flag("--profile-build"), size("--memory-reserve", 0));
+    }
+
+    private long size(String key, long fallback) {
+        return argsMap.containsKey(key) ? dtm.builder.build.BuildOptions.bytes(argsMap.get(key)) : fallback;
     }
 
     private boolean flag(String key) {
@@ -256,6 +265,15 @@ public final class UserArgs {
                 case CLEAN, BUILD, INSTALL, TEST, REFRESH, LOCK -> argsMap.put(arg, "true");
                 case "--interactive", "-i" -> argsMap.put(INTERACTIVE, "true");
                 case "--no-incremental" -> argsMap.put(NO_INCREMENTAL, "true");
+                case "--no-cache", "--profile-build" -> argsMap.put(arg, "true");
+                case "--memory-limit", "--memory-per-job", "--memory-reserve", "--cache-size", "--cache-dir" -> {
+                    i = readValue(args, i, arg);
+                    try {
+                        if (argsMap.get(arg).isBlank()) throw new IllegalArgumentException(arg + " requer um valor");
+                        if (!arg.equals("--cache-dir")) dtm.builder.build.BuildOptions.bytes(argsMap.get(arg));
+                        else java.nio.file.Path.of(argsMap.get(arg));
+                    } catch (IllegalArgumentException e) { invalid(e.getMessage()); }
+                }
                 case "--compile-commands", "--clangd", "--compdb" ->
                         argsMap.put(COMPILE_COMMANDS, "true");
                 case "-f", "-format", "--format" -> i = readValue(args, i, FORMAT);
@@ -282,10 +300,10 @@ public final class UserArgs {
                 case "-j", "--jobs" -> {
                     i = readValue(args, i, JOBS);
                     String jobs = argsMap.getOrDefault(JOBS, "");
-                    if (jobs.isBlank() || !jobs.trim().matches("\\d+")
-                            || Integer.parseInt(jobs.trim()) < 1) {
-                        invalid("--jobs requer um numero inteiro >= 1");
-                    }
+                    try {
+                        if (!jobs.equalsIgnoreCase("auto") && Integer.parseInt(jobs.trim()) < 1)
+                            throw new NumberFormatException();
+                    } catch (NumberFormatException e) { invalid("--jobs requer auto ou um numero inteiro >= 1"); }
                 }
                 default -> invalid("Argumento desconhecido: " + arg);
             }

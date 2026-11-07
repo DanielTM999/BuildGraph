@@ -1,19 +1,19 @@
 package dtm.builder.build.incremental;
 
-import java.util.HashSet;
 import java.util.Set;
 
-/** Estado incremental de um target durante um build; confinado a thread do target. */
 public final class TargetState {
 
     private final String targetId;
     private final TargetBuildState data;
-    private final Set<String> touched = new HashSet<>();
-    private boolean anyRecompiled;
+    private final Set<String> touched = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private volatile boolean anyRecompiled;
+    private volatile boolean dirty;
 
     TargetState(String targetId, TargetBuildState data) {
         this.targetId = targetId;
         this.data = data;
+        data.setObjects(new java.util.concurrent.ConcurrentHashMap<>(data.getObjects()));
     }
 
     public String targetId() {
@@ -34,5 +34,9 @@ public final class TargetState {
 
     void markRecompiled() {
         anyRecompiled = true;
+        dirty = true;
     }
+
+    void markDirty() { dirty = true; }
+    boolean dirty() { return dirty; }
 }

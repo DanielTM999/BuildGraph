@@ -105,10 +105,6 @@ public final class ManifestMerge {
         }
     }
 
-    /**
-     * União por id: entradas do profile com id existente são combinadas
-     * incrementalmente com o target raiz; ids novos viram targets adicionais.
-     */
     public static List<ManifestTargetModel> mergeTargets(List<ManifestTargetModel> base,
                                                          List<ManifestTargetModel> extra) {
         Map<String, ManifestTargetModel> byId = new LinkedHashMap<>();

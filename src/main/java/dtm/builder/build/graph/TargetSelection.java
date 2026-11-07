@@ -4,7 +4,6 @@ import dtm.builder.manifest.model.ManifestRootModel;
 import java.nio.file.Path;
 import java.util.List;
 
-/** One selection contract shared by build, clean, test and install. */
 public final class TargetSelection {
     private TargetSelection() { }
     public static TargetGraph resolve(ManifestRootModel manifest, Path project, boolean msvc,

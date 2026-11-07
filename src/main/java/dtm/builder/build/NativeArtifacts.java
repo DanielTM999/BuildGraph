@@ -13,10 +13,18 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 
-/** Paths and owned outputs, also retained across outputName changes for selective clean. */
 public final class NativeArtifacts {
     private static final ObjectMapper JSON = new ObjectMapper();
     private NativeArtifacts() { }
+
+    public static String objectFileName(Path project, Path source, boolean windows) {
+        Path absolute = source.toAbsolutePath().normalize();
+        String identity;
+        try { identity = project.toAbsolutePath().normalize().relativize(absolute).toString(); }
+        catch (IllegalArgumentException differentRoot) { identity = absolute.toString(); }
+        return dtm.builder.build.incremental.FileHasher.hashCommand(List.of(identity)).substring(0, 32)
+                + (windows ? ".obj" : ".o");
+    }
 
     public static Path artifact(Path buildDir, ManifestRootModel root, ResolvedTarget target, boolean msvc) {
         ManifestRootModel m = TargetResolver.perTargetManifest(root, target);
@@ -104,7 +112,7 @@ public final class NativeArtifacts {
         for (Path path : paths) {
             if (!path.startsWith(base) || path.equals(base)) throw new IOException("Clean recusou caminho fora de build: " + path);
             if (preserved.contains(path)) continue;
-            // Never traverse a directory symlink to remove another target's/external output.
+
             for (Path parent = path.getParent(); parent != null && !parent.equals(base); parent = parent.getParent())
                 if (Files.isSymbolicLink(parent)) throw new IOException("Clean recusou diretorio simbolico: " + parent);
             if (Files.isSymbolicLink(path)) Files.deleteIfExists(path);

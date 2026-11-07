@@ -88,7 +88,7 @@ public final class LifecycleExecutor {
     private static BuildRequest request(LifecycleContext ctx) {
         return new BuildRequest(ctx.projectPath(), ctx.manifest(), ctx.toolchain(),
                 ctx.buildSystem(), ctx.packagesDir(), ctx.buildDir(), ctx.buildMode(),
-                ctx.output(), ctx.jobs(), ctx.onlyTargets(), ctx.incremental(), ctx.executor());
+                ctx.output(), ctx.jobs(), ctx.onlyTargets(), ctx.incremental(), ctx.executor(), ctx.options());
     }
 
     private static boolean notBlank(String s) {
@@ -102,7 +102,7 @@ public final class LifecycleExecutor {
     }
 
     private static LifecycleResult clean(LifecycleContext ctx) {
-        try {
+        try (var lock = dtm.builder.build.BuildDirectoryLock.acquire(ctx.buildDir())) {
             if (!ctx.onlyTargets().isEmpty()) {
                 boolean msvc = ctx.toolchain() != null && ctx.toolchain().isMsvc();
                 var graph = dtm.builder.build.graph.TargetSelection.resolve(ctx.manifest(), ctx.projectPath(), msvc, ctx.onlyTargets());

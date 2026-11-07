@@ -8,13 +8,6 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Extrai os headers reportados por /showIncludes. O prefixo da linha e
- * localizado ("Note: including file:" em ingles, "Observacao: incluindo
- * arquivo:" em pt-BR, possivelmente corrompido pelo encoding OEM), entao ele
- * nunca e comparado com um literal: e detectado na primeira linha cujo resto
- * seja um path absoluto existente e reutilizado nas linhas seguintes.
- */
 public final class MsvcIncludeParser {
 
     private static final Pattern CANDIDATE =
@@ -31,7 +24,6 @@ public final class MsvcIncludeParser {
         this.prefix = knownPrefix;
     }
 
-    /** true se a linha era de include (consumida e nao deve ser exibida). */
     public boolean offer(String line) {
         if (line == null || line.isEmpty()) {
             return false;

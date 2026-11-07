@@ -12,11 +12,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Converte o manifesto efetivo (raiz + profile já compostos) na lista final
- * de targets. Cada target herda as listas da raiz de forma aditiva, com as
- * mesmas regras de composição dos profiles.
- */
 public final class TargetResolver {
 
     private TargetResolver() {
@@ -69,11 +64,6 @@ public final class TargetResolver {
         return new TargetResolution(targets, errors, true);
     }
 
-    /**
-     * Cópia do manifesto efetivo com as listas substituídas pelas listas
-     * finais do target, para reaproveitar CompileCommandBuilder e afins
-     * sem mudanças.
-     */
     public static ManifestRootModel perTargetManifest(ManifestRootModel effective,
                                                       ResolvedTarget target) {
         ManifestRootModel out = new ManifestRootModel();

@@ -13,19 +13,21 @@ import java.util.List;
 
 public final class FileHasher {
 
+    private record Snapshot(long size, java.nio.file.attribute.FileTime modified,
+                            java.nio.file.attribute.FileTime created, Object fileKey, String hash) { }
+    private final java.util.concurrent.ConcurrentHashMap<Path, Snapshot> hashes = new java.util.concurrent.ConcurrentHashMap<>();
+
     static final long RACY_WINDOW_MILLIS = 2000;
     static final String RACY = "racy";
 
-    /** Carimbo "tamanho|mtime|sha256"; tamanho+mtime servem de fast-path na comparacao. */
     public String stamp(Path file) throws IOException {
         Path key = file.toAbsolutePath().normalize();
         BasicFileAttributes attrs = Files.readAttributes(key, BasicFileAttributes.class);
         long modified = attrs.lastModifiedTime().toMillis();
         String mtime = System.currentTimeMillis() - modified < RACY_WINDOW_MILLIS ? RACY : String.valueOf(modified);
-        return attrs.size() + "|" + mtime + "|" + sha256(key);
+        return attrs.size() + "|" + mtime + "|" + sha256(key, attrs);
     }
 
-    /** true se o conteudo do arquivo ainda corresponde ao carimbo gravado. */
     public boolean matches(Path file, String recorded) {
         if (recorded == null || recorded.isBlank()) {
             return false;
@@ -37,11 +39,8 @@ public final class FileHasher {
         Path key = file.toAbsolutePath().normalize();
         try {
             BasicFileAttributes attrs = Files.readAttributes(key, BasicFileAttributes.class);
-            if (String.valueOf(attrs.size()).equals(parts[0])
-                    && String.valueOf(attrs.lastModifiedTime().toMillis()).equals(parts[1])) {
-                return true;
-            }
-            return sha256(key).equals(parts[2]);
+            if (!String.valueOf(attrs.size()).equals(parts[0])) return false;
+            return sha256(key, attrs).equals(parts[2]);
         } catch (IOException e) {
             return false;
         }
@@ -49,6 +48,28 @@ public final class FileHasher {
 
     public String sha256(Path file) throws IOException {
         Path key = file.toAbsolutePath().normalize();
+        return sha256(key, Files.readAttributes(key, BasicFileAttributes.class));
+    }
+
+    private String sha256(Path key, BasicFileAttributes attrs) throws IOException {
+
+        try {
+            return hashes.compute(key, (ignored, previous) -> {
+                try {
+                    if (previous != null && previous.size() == attrs.size()
+                            && previous.modified().equals(attrs.lastModifiedTime())
+                            && previous.created().equals(attrs.creationTime())
+                            && java.util.Objects.equals(previous.fileKey(), attrs.fileKey())) return previous;
+                    return new Snapshot(attrs.size(), attrs.lastModifiedTime(), attrs.creationTime(), attrs.fileKey(), digestFile(key));
+                } catch (IOException e) { throw new java.io.UncheckedIOException(e); }
+            }).hash();
+        } catch (java.io.UncheckedIOException e) { throw e.getCause(); }
+    }
+
+    public void invalidate(Path file) { hashes.remove(file.toAbsolutePath().normalize()); }
+    public void clear() { hashes.clear(); }
+
+    private String digestFile(Path key) throws IOException {
         MessageDigest digest = newDigest();
         try (InputStream in = Files.newInputStream(key)) {
             byte[] buffer = new byte[64 * 1024];

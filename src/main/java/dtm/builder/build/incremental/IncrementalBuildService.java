@@ -9,21 +9,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
-/**
- * Decide o que precisa ser recompilado/relinkado comparando fonte, headers,
- * comando e toolchain com o estado do build anterior. Uma instancia por build;
- * os metodos operam sobre o TargetState confinado a thread de cada target.
- */
 public final class IncrementalBuildService {
 
-    /** Marca objetos cujo mapeamento de headers nao pode ser obtido. */
     static final String UNRESOLVED_DEPS = "<deps-indisponiveis>";
 
     private final Path buildDir;
     private final boolean enabled;
     private final String fingerprint;
     private final String buildMode;
-    private final FileHasher hasher = new FileHasher();
+    private final FileHasher hasher;
+    private boolean ownsHasher;
 
     public IncrementalBuildService(Path buildDir, Toolchain toolchain, String buildMode,
                                    boolean enabled) {
@@ -32,6 +27,13 @@ public final class IncrementalBuildService {
 
     public IncrementalBuildService(Path buildDir, Toolchain toolchain, String buildMode,
                                    boolean enabled, String nativeFingerprint) {
+        this(buildDir, toolchain, buildMode, enabled, nativeFingerprint, new FileHasher());
+        ownsHasher = true;
+    }
+
+    public IncrementalBuildService(Path buildDir, Toolchain toolchain, String buildMode,
+                                   boolean enabled, String nativeFingerprint, FileHasher hasher) {
+        this.hasher = hasher;
         this.buildDir = buildDir;
         this.enabled = enabled;
         this.fingerprint = CompilerFingerprint.of(toolchain) + nativeFingerprint;
@@ -39,6 +41,7 @@ public final class IncrementalBuildService {
     }
 
     public TargetState begin(String targetId) {
+        if (ownsHasher) hasher.clear();
         TargetBuildState previous = enabled ? BuildStateStore.load(buildDir, targetId) : null;
         if (previous == null
                 || !fingerprint.equals(previous.getToolchainFingerprint())
@@ -58,12 +61,13 @@ public final class IncrementalBuildService {
             return false;
         }
         TargetBuildState.ObjectState os = state.data().getObjects().get(key);
-        if (os == null || !Files.isRegularFile(object)) {
+        if (os == null) {
             return false;
         }
         if (!object.getFileName().toString().equals(os.getObjectFile())) {
             return false;
         }
+        if (!hasher.matches(object, os.getObjectStamp())) return false;
         if (!FileHasher.hashCommand(command).equals(os.getCommandHash())) {
             return false;
         }
@@ -75,14 +79,13 @@ public final class IncrementalBuildService {
         }
         for (Map.Entry<String, String> header : os.getHeaders().entrySet()) {
             Path path = Path.of(header.getKey());
-            if (!Files.isRegularFile(path) || !hasher.matches(path, header.getValue())) {
+            if (!hasher.matches(path, header.getValue())) {
                 return false;
             }
         }
         return true;
     }
 
-    /** headers == null indica que as dependencias nao puderam ser coletadas. */
     public void recordCompiled(TargetState state, Path source, Path object,
                                List<String> command, List<Path> headers) {
         state.touched().add(keyOf(source));
@@ -91,6 +94,7 @@ public final class IncrementalBuildService {
         os.setObjectFile(object.getFileName().toString());
         os.setCommandHash(FileHasher.hashCommand(command));
         try {
+            os.setObjectStamp(hasher.stamp(object));
             os.setSourceStamp(hasher.stamp(source));
             if (headers == null) {
                 os.getHeaders().put(UNRESOLVED_DEPS, "");
@@ -133,7 +137,7 @@ public final class IncrementalBuildService {
         for (Path input : inputs) {
             Path normalized = input.toAbsolutePath().normalize();
             String stamp = recorded.get(normalized.toString());
-            if (!Files.isRegularFile(normalized) || !hasher.matches(normalized, stamp)) {
+            if (!hasher.matches(normalized, stamp)) {
                 return true;
             }
         }
@@ -141,6 +145,7 @@ public final class IncrementalBuildService {
     }
 
     public void recordLinked(TargetState state, List<String> command, List<Path> inputs) {
+        state.markDirty();
         state.data().setLinkCommandHash(FileHasher.hashCommand(command));
         state.data().getLinkInputs().clear();
         for (Path input : inputs) {
@@ -155,14 +160,15 @@ public final class IncrementalBuildService {
         }
     }
 
-    /** Link falhou: invalida o hash para que o proximo build sempre relinke. */
     public void recordLinkFailed(TargetState state) {
+        state.markDirty();
         state.data().setLinkCommandHash("");
         state.data().getLinkInputs().clear();
     }
 
     public void finish(TargetState state, Consumer<String> log) {
-        state.data().getObjects().keySet().retainAll(state.touched());
+        if (state.data().getObjects().keySet().retainAll(state.touched())) state.markDirty();
+        if (!state.dirty()) return;
         try {
             BuildStateStore.save(buildDir, state.targetId(), state.data());
         } catch (IOException e) {
@@ -171,6 +177,12 @@ public final class IncrementalBuildService {
                         + state.targetId() + ": " + e.getMessage());
             }
         }
+    }
+
+    public void invalidateObject(TargetState state, Path source) {
+        state.touched().add(keyOf(source));
+        state.data().getObjects().remove(keyOf(source));
+        state.markDirty();
     }
 
     private String keyOf(Path source) {

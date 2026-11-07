@@ -13,7 +13,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** Resolve constraints e dependencias transitivas com backtracking por versao. */
 public final class DependencyResolver {
 
     private final GlobalRepository repository;

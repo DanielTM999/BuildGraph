@@ -7,7 +7,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 
-/** Checks actual outputs, catching a native assembler/compiler accidentally used for a cross target. */
 public final class ObjectFormatValidator {
     private ObjectFormatValidator() { }
     private static final Map<String, Integer> ELF_MACHINES = Map.ofEntries(
@@ -48,7 +47,7 @@ public final class ObjectFormatValidator {
         int machine = Short.toUnsignedInt(bytes.getShort(0));
         int expected = p.arch().equals("x86_64") ? 0x8664 : p.arch().equals("x86") ? 0x14c
                 : p.arch().equals("aarch64") ? 0xaa64 : p.arch().startsWith("arm") ? 0x1c4 : 0;
-        // Other GNU architectures may use non-ELF formats; their backend remains authoritative.
+
         if (p.windows() && expected != 0 && machine == expected) return;
         if (expected != 0) mismatch(object, p);
     }

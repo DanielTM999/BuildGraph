@@ -15,12 +15,10 @@ public final class BuildStateStore {
     private BuildStateStore() {
     }
 
-    /** Fica dentro de buildDir de proposito: a fase clean ja o remove junto. */
     public static Path stateDir(Path buildDir) {
         return buildDir.resolve(".buildgraph-state");
     }
 
-    /** null se ausente, corrompido ou de schema incompativel (forca rebuild do target). */
     public static TargetBuildState load(Path buildDir, String targetId) {
         Path file = stateFile(buildDir, targetId);
         if (!Files.isRegularFile(file)) {
@@ -41,14 +39,16 @@ public final class BuildStateStore {
             throws IOException {
         Path file = stateFile(buildDir, targetId);
         Files.createDirectories(file.getParent());
-        Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
-        MAPPER.writerWithDefaultPrettyPrinter().writeValue(tmp.toFile(), state);
+        Path tmp = Files.createTempFile(file.getParent(), targetId + "-", ".tmp");
         try {
-            Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING,
-                    StandardCopyOption.ATOMIC_MOVE);
-        } catch (AtomicMoveNotSupportedException e) {
-            Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
-        }
+            MAPPER.writerWithDefaultPrettyPrinter().writeValue(tmp.toFile(), state);
+            try {
+                Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING,
+                        StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally { Files.deleteIfExists(tmp); }
     }
 
     public static Path stateFile(Path buildDir, String targetId) {

@@ -64,7 +64,7 @@ class TargetSchedulerTest {
         TargetScheduler.Result r = TargetScheduler.run(graph, 2, t -> {
             bothStarted.countDown();
             try {
-                // só termina quando os dois estiverem rodando ao mesmo tempo
+
                 if (!bothStarted.await(5, TimeUnit.SECONDS)) {
                     return BuildResult.fail(1, "targets nao rodaram em paralelo");
                 }

@@ -18,11 +18,21 @@ public record BuildRequest(
         int jobs,
         List<String> onlyTargets,
         boolean incremental,
-        ProcessExecutor executor) {
+        ProcessExecutor executor,
+        BuildOptions options) {
 
     public BuildRequest {
         onlyTargets = onlyTargets == null ? List.of() : onlyTargets;
         executor = executor == null ? ProcessExecutor.REAL : executor;
+        options = options == null ? BuildOptions.defaults() : options;
+    }
+
+    public BuildRequest(Path projectPath, ManifestRootModel manifest, Toolchain toolchain,
+                        BuildSystem buildSystem, Path packagesDir, Path buildDir,
+                        String buildMode, Consumer<String> output, int jobs,
+                        List<String> onlyTargets, boolean incremental, ProcessExecutor executor) {
+        this(projectPath, manifest, toolchain, buildSystem, packagesDir, buildDir, buildMode,
+                output, jobs, onlyTargets, incremental, executor, BuildOptions.defaults());
     }
 
     public BuildRequest(Path projectPath, ManifestRootModel manifest, Toolchain toolchain,

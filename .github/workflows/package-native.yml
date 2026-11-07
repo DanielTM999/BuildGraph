@@ -63,32 +63,95 @@ jobs:
         shell: pwsh
         run: mvn --batch-mode --no-transfer-progress "-Drevision=$env:APP_VERSION" clean package
 
-      - name: Prepare jpackage input
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path jpackage-input | Out-Null
-          Copy-Item -LiteralPath target/BuildGraph.jar -Destination jpackage-input/BuildGraph.jar
-          Copy-Item -LiteralPath LICENSE -Destination jpackage-input/LICENSE
-
       - name: Create self-contained application with jpackage
         shell: pwsh
         run: |
-          $arguments = @(
-            '--type', 'app-image',
-            '--input', 'jpackage-input',
-            '--dest', 'dist',
-            '--name', $env:APP_NAME,
-            '--app-version', $env:APP_VERSION,
-            '--main-jar', 'BuildGraph.jar',
-            '--main-class', 'dtm.builder.Main',
-            '--description', 'BuildGraph build system for C and C++'
-          )
-          if ('${{ runner.os }}' -eq 'Windows') {
-            $arguments += '--win-console'
-          }
-          & jpackage @arguments
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
+          $ErrorActionPreference = 'Stop'
+          $projectRoot = $PWD.Path
+          $JarPath = (Resolve-Path -LiteralPath 'target/BuildGraph.jar').Path
+          $Destination = Join-Path $projectRoot 'dist'
+          $AppVersion = $env:APP_VERSION
+
+          $temporaryInput = Join-Path $projectRoot ('target/jpackage-input-' + [Guid]::NewGuid().ToString('N'))
+          $temporaryIconset = $null
+          $temporaryIconFiles = [Collections.Generic.List[string]]::new()
+          New-Item -ItemType Directory -Path $temporaryInput -Force | Out-Null
+          try {
+              Copy-Item -LiteralPath $JarPath -Destination (Join-Path $temporaryInput 'BuildGraph.jar')
+              Copy-Item -LiteralPath (Join-Path $projectRoot 'LICENSE') -Destination (Join-Path $temporaryInput 'LICENSE')
+              $packageArguments = @(
+                  '--type', 'app-image',
+                  '--input', $temporaryInput,
+                  '--dest', $Destination,
+                  '--name', 'BuildGraph',
+                  '--app-version', $AppVersion,
+                  '--main-jar', 'BuildGraph.jar',
+                  '--main-class', 'dtm.builder.Main',
+                  '--description', 'BuildGraph build system for C and C++'
+              )
+              if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
+                  $icon = (Resolve-Path -LiteralPath (Join-Path $projectRoot 'BuildGraph.ico')).Path
+                  $packageArguments += @('--win-console', '--icon', $icon)
+              } elseif ([Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([Runtime.InteropServices.OSPlatform]::OSX)) {
+                  $png = (Resolve-Path -LiteralPath (Join-Path $projectRoot 'BuildGraph.png')).Path
+                  $iconId = [Guid]::NewGuid().ToString('N')
+                  $temporaryIconset = Join-Path $projectRoot ("target/jpackage-icon-$iconId.iconset")
+                  New-Item -ItemType Directory -Path $temporaryIconset | Out-Null
+                  $sizes = [ordered]@{
+                      'icon_16x16.png' = 16
+                      'icon_16x16@2x.png' = 32
+                      'icon_32x32.png' = 32
+                      'icon_32x32@2x.png' = 64
+                      'icon_128x128.png' = 128
+                      'icon_128x128@2x.png' = 256
+                      'icon_256x256.png' = 256
+                      'icon_256x256@2x.png' = 512
+                      'icon_512x512.png' = 512
+                      'icon_512x512@2x.png' = 1024
+                  }
+                  foreach ($size in $sizes.GetEnumerator()) {
+                      $resized = Join-Path $temporaryIconset $size.Key
+                      $temporaryIconFiles.Add($resized)
+                      & /usr/bin/sips -z $size.Value $size.Value $png --out $resized | Out-Null
+                      if ($LASTEXITCODE -ne 0) {
+                          throw "sips failed with exit code $LASTEXITCODE"
+                      }
+                  }
+                  $icon = Join-Path $projectRoot ("target/jpackage-icon-$iconId.icns")
+                  $temporaryIconFiles.Add($icon)
+                  & /usr/bin/iconutil -c icns -o $icon $temporaryIconset
+                  if ($LASTEXITCODE -ne 0) {
+                      throw "iconutil failed with exit code $LASTEXITCODE"
+                  }
+                  $packageArguments += @('--icon', $icon)
+              } elseif ([Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([Runtime.InteropServices.OSPlatform]::Linux)) {
+                  $icon = (Resolve-Path -LiteralPath (Join-Path $projectRoot 'BuildGraph.png')).Path
+                  $packageArguments += @('--icon', $icon)
+              }
+              & jpackage @packageArguments
+              if ($LASTEXITCODE -ne 0) {
+                  throw "jpackage failed with exit code $LASTEXITCODE"
+              }
+          } finally {
+              foreach ($temporaryIcon in $temporaryIconFiles) {
+                  if (Test-Path -LiteralPath $temporaryIcon -PathType Leaf) {
+                      Remove-Item -LiteralPath $temporaryIcon
+                  }
+              }
+              if ($temporaryIconset -and (Test-Path -LiteralPath $temporaryIconset -PathType Container) -and
+                      @(Get-ChildItem -LiteralPath $temporaryIconset -Force).Count -eq 0) {
+                  Remove-Item -LiteralPath $temporaryIconset
+              }
+              foreach ($fileName in @('BuildGraph.jar', 'LICENSE')) {
+                  $temporaryFile = Join-Path $temporaryInput $fileName
+                  if (Test-Path -LiteralPath $temporaryFile -PathType Leaf) {
+                      Remove-Item -LiteralPath $temporaryFile
+                  }
+              }
+              if ((Test-Path -LiteralPath $temporaryInput -PathType Container) -and
+                      @(Get-ChildItem -LiteralPath $temporaryInput -Force).Count -eq 0) {
+                  Remove-Item -LiteralPath $temporaryInput
+              }
           }
 
       - name: Smoke test packaged launcher
