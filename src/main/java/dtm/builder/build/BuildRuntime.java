@@ -5,6 +5,7 @@ import dtm.builder.build.incremental.FileHasher;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 final class BuildRuntime implements AutoCloseable {
     final BuildMetrics metrics;
@@ -16,7 +17,7 @@ final class BuildRuntime implements AutoCloseable {
     private final BuildDirectoryLock directoryLock;
     private final BuildRequest request;
     private final Object outputLock = new Object();
-    final java.util.function.Consumer<String> output;
+    final Consumer<String> output;
     private final ConcurrentHashMap<String, List<Path>> sources = new ConcurrentHashMap<>();
     private volatile PackagePaths packages;
 

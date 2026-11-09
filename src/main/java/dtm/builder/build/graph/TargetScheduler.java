@@ -1,6 +1,7 @@
 package dtm.builder.build.graph;
 
 import dtm.builder.build.BuildResult;
+import dtm.builder.printer.Severity;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -10,6 +11,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 public final class TargetScheduler {
@@ -20,15 +22,14 @@ public final class TargetScheduler {
     private TargetScheduler() {
     }
 
-    public static Result run(TargetGraph graph, int jobs, TargetBuilder builder,
-                             Consumer<String> info) {
+    public static Result run(TargetGraph graph, int jobs, TargetBuilder builder, Consumer<String> info) {
         int limit = jobs > 0 ? jobs : Runtime.getRuntime().availableProcessors();
         limit = Math.max(1, Math.min(limit, graph.size()));
 
         if (limit == 1) {
             return runSerial(graph, builder);
         }
-        return runParallel(graph, limit, builder, info);
+        return runParallel(graph, limit, builder, (s, o) -> info.accept(o));
     }
 
     private static Result runSerial(TargetGraph graph, TargetBuilder builder) {
@@ -46,8 +47,7 @@ public final class TargetScheduler {
         return new Result(results, skippedIds(graph, results), success);
     }
 
-    private static Result runParallel(TargetGraph graph, int limit, TargetBuilder builder,
-                                      Consumer<String> info) {
+    private static Result runParallel(TargetGraph graph, int limit, TargetBuilder builder, BiConsumer<Severity, String> info) {
         Object lock = new Object();
         Map<String, BuildResult> results = new LinkedHashMap<>();
         Set<String> done = new HashSet<>();
@@ -58,7 +58,7 @@ public final class TargetScheduler {
         ExecutorService pool = Executors.newFixedThreadPool(limit);
         try {
             synchronized (lock) {
-                info.accept("Build paralelo com " + limit + " jobs");
+                info.accept(Severity.INFO, "Build paralelo com " + limit + " jobs");
                 scheduleReady(graph, pool, builder, lock, results, done, started, running, failed);
                 while (running[0] > 0 || (!failed[0] && done.size() < graph.size())) {
                     try {

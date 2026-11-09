@@ -51,7 +51,7 @@ public final class BuildExecutor {
         }).sum();
         runtime.output.accept("[0/" + total + "] Iniciando build");
         java.util.concurrent.atomic.AtomicInteger completed = new java.util.concurrent.atomic.AtomicInteger();
-        TargetScheduler.Result result = TargetScheduler.run(graph, runtime.scheduler.workers(), target -> {
+        TargetScheduler.Result result = TargetScheduler.run(graph, runtime.scheduler.workers(), (target) -> {
             BuildResult built = NativeTargetBuilder.build(req, target, graph,
                     line -> runtime.output.accept("[" + target.id() + "] " + line),
                     (message, started) -> {

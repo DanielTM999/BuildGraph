@@ -148,8 +148,7 @@ public final class BuildContext {
     public SyncResult lock() {
         Configuration configuration = configuration(readManifest());
         printer.println(Severity.INFO, "Atualizando lock de dependencias...");
-        SyncResult result = configuration.resolver().lockPackages(profileOverride,
-                msg -> printer.println(Severity.INFO, "{}", msg));
+        SyncResult result = configuration.resolver().lockPackages(profileOverride, msg -> printer.println(Severity.INFO, "{}", msg));
         Severity severity = result.isFailure() ? Severity.ERROR : Severity.INFO;
         printer.println(severity, "Lock: {}", result.name());
         return result;
@@ -157,6 +156,10 @@ public final class BuildContext {
 
     public SyncResult syncPackagesForBuild() {
         return doBuildSync(configuration(readManifest()));
+    }
+    
+    private void log(Severity severity, String message) {
+        printer.println(severity, "{}", message);
     }
 
     public String compilationDatabaseJson() {
