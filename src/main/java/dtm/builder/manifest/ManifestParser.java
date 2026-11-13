@@ -1,5 +1,6 @@
 package dtm.builder.manifest;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -32,13 +33,13 @@ public final class ManifestParser {
     private static final ObjectMapper JSON = JsonMapper.builder()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
             .enable(SerializationFeature.INDENT_OUTPUT)
-            .serializationInclusion(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+            .serializationInclusion(JsonInclude.Include.NON_NULL)
             .build();
 
     private static final XmlMapper XML = (XmlMapper) XmlMapper.builder()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
             .enable(SerializationFeature.INDENT_OUTPUT)
-            .serializationInclusion(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+            .serializationInclusion(JsonInclude.Include.NON_NULL)
             .build();
 
     private ManifestParser() {

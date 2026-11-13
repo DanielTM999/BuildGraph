@@ -1,6 +1,7 @@
 package dtm.builder.manifest.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
@@ -20,11 +21,11 @@ public class ManifestTargetModel extends NativeOptions {
     private String name;
     private String type;
     private String platform;
-    @com.fasterxml.jackson.annotation.JsonProperty("cCompiler")
+    @JsonProperty("cCompiler")
     private String cCompiler;
     public String getCCompiler() { return cCompiler; }
     public void setCCompiler(String value) { cCompiler = value; }
-    @com.fasterxml.jackson.annotation.JsonProperty("cxxCompiler")
+    @JsonProperty("cxxCompiler")
     private String cxxCompiler;
     public String getCxxCompiler() { return cxxCompiler; }
     public void setCxxCompiler(String value) { cxxCompiler = value; }

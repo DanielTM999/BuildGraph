@@ -2,6 +2,7 @@ package dtm.builder.manifest;
 
 import dtm.builder.manifest.model.ManifestPackagesModel;
 import dtm.builder.manifest.model.ManifestTargetModel;
+import dtm.builder.manifest.model.NativeOptions;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -131,7 +132,7 @@ public final class ManifestMerge {
     public static ManifestTargetModel mergeTarget(ManifestTargetModel base,
                                                   ManifestTargetModel override) {
         ManifestTargetModel out = new ManifestTargetModel();
-        dtm.builder.manifest.model.NativeOptions.merge(base, override, out);
+        NativeOptions.merge(base, override, out);
         out.setPlatform(pick(base.getPlatform(), override.getPlatform()));
         out.setCCompiler(pick(base.getCCompiler(), override.getCCompiler()));
         out.setCxxCompiler(pick(base.getCxxCompiler(), override.getCxxCompiler()));

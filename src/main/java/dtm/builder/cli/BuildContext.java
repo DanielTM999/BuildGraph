@@ -1,13 +1,23 @@
 package dtm.builder.cli;
 
 import dtm.builder.build.BuildDiagnosticParser;
+import dtm.builder.build.BuildOptions;
 import dtm.builder.build.BuildSystem;
 import dtm.builder.build.BuildSystemDetector;
 import dtm.builder.build.SourceCollector;
 import dtm.builder.build.TargetPlatform;
 import dtm.builder.build.Toolchain;
 import dtm.builder.build.ToolchainDetector;
+import dtm.builder.build.graph.ResolvedTarget;
+import dtm.builder.build.graph.TargetResolution;
+import dtm.builder.build.graph.TargetResolver;
+import dtm.builder.build.graph.TargetSelection;
 import dtm.builder.integration.CompilationDatabaseGenerator;
+import dtm.builder.lifecycle.LifecycleContext;
+import dtm.builder.lifecycle.LifecycleExecutor;
+import dtm.builder.lifecycle.LifecycleResult;
+import dtm.builder.lifecycle.Phase;
+import dtm.builder.manifest.ManifestParser;
 import dtm.builder.manifest.ManifestProfiles;
 import dtm.builder.manifest.ManifestResolver;
 import dtm.builder.manifest.ProjectManifestFiles;
@@ -16,10 +26,6 @@ import dtm.builder.manifest.model.ManifestParseResult;
 import dtm.builder.manifest.model.ManifestProfileModel;
 import dtm.builder.manifest.model.ManifestRootModel;
 import dtm.builder.manifest.model.ManifestTargetModel;
-import dtm.builder.lifecycle.LifecycleContext;
-import dtm.builder.lifecycle.LifecycleExecutor;
-import dtm.builder.lifecycle.LifecycleResult;
-import dtm.builder.lifecycle.Phase;
 import dtm.builder.placeholder.PlaceholderContext;
 import dtm.builder.placeholder.PlaceholderResolver;
 import dtm.builder.printer.Printer;
@@ -28,11 +34,13 @@ import dtm.builder.printer.formater.RawFormater;
 import dtm.builder.repo.GlobalRepository;
 import dtm.builder.repo.SyncResult;
 
-import java.nio.file.Path;
-import java.nio.file.Files;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -50,36 +58,36 @@ public final class BuildContext {
     private final String packagesOverride;
     private final Printer printer;
     private final int jobs;
-    private final java.util.List<String> onlyTargets;
+    private final List<String> onlyTargets;
     private final String testMainOverride;
     private final boolean incremental;
-    private final dtm.builder.build.BuildOptions options;
+    private final BuildOptions options;
     private final boolean skipTests;
-    private final java.util.List<String> skippedTests;
+    private final List<String> skippedTests;
 
     public BuildContext(Path projectPath, String repoOverride, String profileOverride,
                         String compilerOverride, String packagesOverride, Printer printer) {
         this(projectPath, repoOverride, profileOverride, compilerOverride, packagesOverride,
-                printer, 0, java.util.List.of());
+                printer, 0, List.of());
     }
 
     public BuildContext(Path projectPath, String repoOverride, String profileOverride,
                         String compilerOverride, String packagesOverride, Printer printer,
-                        int jobs, java.util.List<String> onlyTargets) {
+                        int jobs, List<String> onlyTargets) {
         this(projectPath, repoOverride, profileOverride, compilerOverride, packagesOverride,
                 printer, jobs, onlyTargets, null);
     }
 
     public BuildContext(Path projectPath, String repoOverride, String profileOverride,
                         String compilerOverride, String packagesOverride, Printer printer,
-                        int jobs, java.util.List<String> onlyTargets, String testMainOverride) {
+                        int jobs, List<String> onlyTargets, String testMainOverride) {
         this(projectPath, repoOverride, profileOverride, compilerOverride, packagesOverride,
                 printer, jobs, onlyTargets, testMainOverride, true);
     }
 
     public BuildContext(Path projectPath, String repoOverride, String profileOverride,
                         String compilerOverride, String packagesOverride, Printer printer,
-                        int jobs, java.util.List<String> onlyTargets, String testMainOverride,
+                        int jobs, List<String> onlyTargets, String testMainOverride,
                         boolean incremental) {
         this(projectPath, repoOverride, profileOverride, compilerOverride, packagesOverride, printer,
                 jobs, onlyTargets, testMainOverride, incremental, null, null);
@@ -87,28 +95,28 @@ public final class BuildContext {
 
     public BuildContext(Path projectPath, String repoOverride, String profileOverride,
                         String compilerOverride, String packagesOverride, Printer printer,
-                        int jobs, java.util.List<String> onlyTargets, String testMainOverride,
+                        int jobs, List<String> onlyTargets, String testMainOverride,
                         boolean incremental, String cCompilerOverride, String cxxCompilerOverride) {
         this(projectPath, repoOverride, profileOverride, compilerOverride, packagesOverride, printer,
                 jobs, onlyTargets, testMainOverride, incremental, cCompilerOverride, cxxCompilerOverride,
-                false, java.util.List.of());
+                false, List.of());
     }
 
     public BuildContext(Path projectPath, String repoOverride, String profileOverride,
                         String compilerOverride, String packagesOverride, Printer printer,
-                        int jobs, java.util.List<String> onlyTargets, String testMainOverride,
+                        int jobs, List<String> onlyTargets, String testMainOverride,
                         boolean incremental, String cCompilerOverride, String cxxCompilerOverride,
-                        boolean skipTests, java.util.List<String> skippedTests) {
+                        boolean skipTests, List<String> skippedTests) {
         this(projectPath, repoOverride, profileOverride, compilerOverride, packagesOverride, printer,
                 jobs, onlyTargets, testMainOverride, incremental, cCompilerOverride, cxxCompilerOverride,
-                skipTests, skippedTests, dtm.builder.build.BuildOptions.defaults());
+                skipTests, skippedTests, BuildOptions.defaults());
     }
 
     public BuildContext(Path projectPath, String repoOverride, String profileOverride,
                         String compilerOverride, String packagesOverride, Printer printer,
-                        int jobs, java.util.List<String> onlyTargets, String testMainOverride,
+                        int jobs, List<String> onlyTargets, String testMainOverride,
                         boolean incremental, String cCompilerOverride, String cxxCompilerOverride,
-                        boolean skipTests, java.util.List<String> skippedTests, dtm.builder.build.BuildOptions options) {
+                        boolean skipTests, List<String> skippedTests, BuildOptions options) {
         this.options = options;
         this.cCompilerOverride = cCompilerOverride;
         this.cxxCompilerOverride = cxxCompilerOverride;
@@ -119,11 +127,11 @@ public final class BuildContext {
         this.packagesOverride = packagesOverride;
         this.printer = printer;
         this.jobs = jobs;
-        this.onlyTargets = onlyTargets == null ? java.util.List.of() : onlyTargets;
+        this.onlyTargets = onlyTargets == null ? List.of() : onlyTargets;
         this.testMainOverride = testMainOverride;
         this.incremental = incremental;
         this.skipTests = skipTests;
-        this.skippedTests = skippedTests == null ? java.util.List.of() : java.util.List.copyOf(skippedTests);
+        this.skippedTests = skippedTests == null ? List.of() : List.copyOf(skippedTests);
     }
 
     public Path projectPath() {
@@ -222,7 +230,7 @@ public final class BuildContext {
         return runPhases(phases, onlyTargets);
     }
 
-    public boolean runPhases(Set<Phase> phases, java.util.List<String> selectedTargets) {
+    public boolean runPhases(Set<Phase> phases, List<String> selectedTargets) {
         ManifestParseResult parse = readManifest();
         boolean hasManifest = manifestPath() != null;
         if (hasManifest) {
@@ -259,7 +267,7 @@ public final class BuildContext {
             if (!selectedTargets.isEmpty() && buildSystem != BuildSystem.MANIFEST && buildSystem != BuildSystem.DEFAULT)
                 throw new IllegalArgumentException("--target requer build direto por manifest; backend " + buildSystem);
             if (buildSystem == BuildSystem.MANIFEST || buildSystem == BuildSystem.DEFAULT)
-                dtm.builder.build.graph.TargetSelection.resolve(effective, projectPath,
+                TargetSelection.resolve(effective, projectPath,
                         toolchain != null && toolchain.isMsvc(), selectedTargets);
         } catch (IllegalArgumentException e) {
             printBuildSummary(LifecycleResult.fail(e.getMessage()), (System.nanoTime() - startNanos) / 1_000_000L);
@@ -337,10 +345,10 @@ public final class BuildContext {
 
     private static String formatDuration(long elapsedMillis) {
         if (elapsedMillis < 60_000L) {
-            return String.format(java.util.Locale.ROOT, "%.3f s", elapsedMillis / 1000.0);
+            return String.format(Locale.ROOT, "%.3f s", elapsedMillis / 1000.0);
         }
         long totalSeconds = elapsedMillis / 1000L;
-        return String.format(java.util.Locale.ROOT, "%02d:%02d min",
+        return String.format(Locale.ROOT, "%02d:%02d min",
                 totalSeconds / 60, totalSeconds % 60);
     }
 
@@ -369,15 +377,15 @@ public final class BuildContext {
     }
 
     private String describeTargets(ManifestRootModel effective, Toolchain toolchain) {
-        dtm.builder.build.graph.TargetResolution resolution =
-                dtm.builder.build.graph.TargetResolver.resolve(effective, projectPath,
+        TargetResolution resolution =
+                TargetResolver.resolve(effective, projectPath,
                         toolchain != null && toolchain.isMsvc());
         if (!resolution.multiTarget()) {
             return "";
         }
         StringBuilder sb = new StringBuilder(", targets=[");
         boolean first = true;
-        for (dtm.builder.build.graph.ResolvedTarget t : resolution.targets()) {
+        for (ResolvedTarget t : resolution.targets()) {
             if (!first) {
                 sb.append(", ");
             }
@@ -397,8 +405,8 @@ public final class BuildContext {
     private ManifestParseResult readManifest() {
         Path path = manifestPath();
         return path == null
-                ? new ManifestParseResult(null, java.util.List.of())
-                : dtm.builder.manifest.ManifestParser.readManifest(path);
+                ? new ManifestParseResult(null, List.of())
+                : ManifestParser.readManifest(path);
     }
 
     private void printDiagnostics(ManifestParseResult parse) {

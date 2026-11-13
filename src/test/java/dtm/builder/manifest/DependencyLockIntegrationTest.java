@@ -13,6 +13,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -71,7 +72,7 @@ class DependencyLockIntegrationTest {
         assertEquals(SyncResult.APPLIED_CHANGED,
                 resolver.syncPackagesForBuild(null, packages, log::add));
         assertTrue(log.stream().anyMatch(line -> line.contains("desatualizado")));
-        assertTrue(java.util.Arrays.equals(originalLock,
+        assertTrue(Arrays.equals(originalLock,
                 Files.readAllBytes(project.resolve(DependencyLock.FILE_NAME))));
         PackageLock materialized = RepoJson.read(
                 packages.resolve("core").resolve(PackageLock.FILE_NAME), PackageLock.class);

@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -75,7 +76,7 @@ public final class TargetScheduler {
             if (interrupted) pool.shutdownNow();
             else pool.shutdown();
             while (!pool.isTerminated()) {
-                try { pool.awaitTermination(1, java.util.concurrent.TimeUnit.SECONDS); }
+                try { pool.awaitTermination(1, TimeUnit.SECONDS); }
                 catch (InterruptedException e) { interrupted = true; pool.shutdownNow(); }
             }
             if (interrupted) Thread.currentThread().interrupt();

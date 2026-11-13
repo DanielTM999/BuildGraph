@@ -2,6 +2,7 @@ package dtm.builder.build;
 
 import dtm.builder.manifest.model.ManifestRootModel;
 
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -71,7 +72,7 @@ final class TestExclusions {
             if (!path.isAbsolute()) return raw;
             Path normalized = path.normalize();
             return normalized.startsWith(testDir) ? testDir.relativize(normalized).toString() : raw;
-        } catch (java.nio.file.InvalidPathException e) {
+        } catch (InvalidPathException e) {
             return raw;
         }
     }

@@ -1,5 +1,6 @@
 package dtm.builder.build;
 
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Consumer;
@@ -17,7 +18,7 @@ public final class BuildMetrics {
     public void report(Consumer<String> output, int peak, long budget, int workers) {
         if (!enabled) return;
         output.accept("[profile] workers=" + workers + " memory_budget_bytes=" + budget + " max_compilations=" + peak);
-        counters.entrySet().stream().sorted(java.util.Map.Entry.comparingByKey())
+        counters.entrySet().stream().sorted(Map.Entry.comparingByKey())
                 .forEach(entry -> output.accept("[profile] " + entry.getKey() + "=" + entry.getValue().sum()));
     }
 }

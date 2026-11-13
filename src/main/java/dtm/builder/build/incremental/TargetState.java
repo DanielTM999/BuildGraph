@@ -1,19 +1,20 @@
 package dtm.builder.build.incremental;
 
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class TargetState {
 
     private final String targetId;
     private final TargetBuildState data;
-    private final Set<String> touched = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final Set<String> touched = ConcurrentHashMap.newKeySet();
     private volatile boolean anyRecompiled;
     private volatile boolean dirty;
 
     TargetState(String targetId, TargetBuildState data) {
         this.targetId = targetId;
         this.data = data;
-        data.setObjects(new java.util.concurrent.ConcurrentHashMap<>(data.getObjects()));
+        data.setObjects(new ConcurrentHashMap<>(data.getObjects()));
     }
 
     public String targetId() {

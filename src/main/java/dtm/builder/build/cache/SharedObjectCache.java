@@ -1,9 +1,11 @@
 package dtm.builder.build.cache;
 
 import dtm.builder.build.incremental.FileHasher;
+
 import java.io.*;
 import java.nio.channels.FileChannel;
 import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -90,7 +92,7 @@ public final class SharedObjectCache {
                         String name = path.getFileName().toString();
                         String shard = path.getParent().getFileName().toString();
                         if (name.matches("[a-f0-9]{64}\\.entry") && name.startsWith(shard) && shard.matches("[a-f0-9]{2}")) {
-                            var attributes = Files.readAttributes(path, java.nio.file.attribute.BasicFileAttributes.class);
+                            var attributes = Files.readAttributes(path, BasicFileAttributes.class);
                             entries.add(new Item(path, attributes.size(), attributes.lastModifiedTime().toMillis()));
                             total += attributes.size();
                         } else if (name.startsWith(".write-") && name.endsWith(".tmp") && shard.matches("[a-f0-9]{2}")

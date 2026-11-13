@@ -1,6 +1,7 @@
 package dtm.builder.manifest.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
@@ -21,9 +22,9 @@ public class ManifestProfileModel extends NativeOptions {
     private String cStandard;
     private String cxxStandard;
     private String sysroot;
-    @com.fasterxml.jackson.annotation.JsonProperty("cCompiler")
+    @JsonProperty("cCompiler")
     private String cCompiler;
-    @com.fasterxml.jackson.annotation.JsonProperty("cxxCompiler")
+    @JsonProperty("cxxCompiler")
     private String cxxCompiler;
     private String outputDir;
     private String packagesBase;
@@ -151,7 +152,7 @@ public class ManifestProfileModel extends NativeOptions {
         this.sysroot = sysroot;
     }
 
-    @com.fasterxml.jackson.annotation.JsonProperty("cCompiler")
+    @JsonProperty("cCompiler")
     public String getCCompiler() {
         return cCompiler;
     }
@@ -160,7 +161,7 @@ public class ManifestProfileModel extends NativeOptions {
         this.cCompiler = cCompiler;
     }
 
-    @com.fasterxml.jackson.annotation.JsonProperty("cxxCompiler")
+    @JsonProperty("cxxCompiler")
     public String getCxxCompiler() {
         return cxxCompiler;
     }

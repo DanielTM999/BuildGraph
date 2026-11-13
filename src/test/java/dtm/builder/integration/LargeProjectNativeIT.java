@@ -4,9 +4,12 @@ import dtm.builder.build.*;
 import dtm.builder.manifest.model.ManifestRootModel;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+
 import java.nio.file.*;
 import java.util.List;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class LargeProjectNativeIT {
@@ -26,7 +29,7 @@ class LargeProjectNativeIT {
         var manifest = new ManifestRootModel(); manifest.setName("app"); manifest.setSources(List.of("src"));
         manifest.setCCompiler(System.getProperty("buildgraph.it.cCompiler")); manifest.setCxxCompiler(System.getProperty("buildgraph.it.cxxCompiler"));
         var toolchain = ToolchainDetector.resolve(manifest, null, null, null, root);
-        var log = new java.util.concurrent.ConcurrentLinkedQueue<String>();
+        var log = new ConcurrentLinkedQueue<String>();
         BuildRequest request = new BuildRequest(root, manifest, toolchain, BuildSystem.MANIFEST, root.resolve("packages"), root.resolve("build"),
                 "Release", log::add, 4, List.of(), true, null,
                 new BuildOptions(256L << 20, 32L << 20, temp.resolve("cache"), 0, false, true, 128L << 20));

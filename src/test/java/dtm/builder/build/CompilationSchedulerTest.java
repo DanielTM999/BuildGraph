@@ -1,17 +1,47 @@
 package dtm.builder.build;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class CompilationSchedulerTest {
     private static ResourceManager resources(int workers, long budget) {
         var options = new BuildOptions(budget, 0, Path.of("unused"), 0, false, false);
         return new ResourceManager(workers, options, 8, 32L << 30, () -> 16L << 30);
+    }
+
+    @Test void estimatesFollowMeasuredCompilerPeaks(@TempDir Path dir) throws Exception {
+        Path source = Files.writeString(dir.resolve("unit.cpp"), "x".repeat(100_000));
+        long heuristic = ResourceManager.estimate(source, 0, 0);
+        assertTrue(heuristic >= 256L << 20 && heuristic < 512L << 20, Long.toString(heuristic));
+        assertEquals(250L << 20, ResourceManager.estimate(source, 0, 200L << 20));
+        assertEquals(64L << 20, ResourceManager.estimate(source, 0, 1L << 20));
+        assertTrue(ResourceManager.estimate(source, 1L << 30, 200L << 20) >= 1L << 30);
+        assertTrue(ResourceManager.estimate(dir.resolve("unit.c"), 0, 0) < heuristic);
+    }
+
+    @Test void memoryAdmissionFollowsCurrentlyAvailableMemory() {
+        var options = new BuildOptions(0, 0, Path.of("unused"), 0, false, false);
+        long[] free = {1L << 30};
+        var resources = new ResourceManager(8, options, 8, 8L << 30, () -> free[0]);
+        resources.acquire(300L << 20);
+        assertTrue(resources.canAcquire(300L << 20));
+        free[0] = 700L << 20;
+        assertFalse(resources.canAcquire(300L << 20));
+        free[0] = 3L << 30;
+        assertTrue(resources.canAcquire(300L << 20));
+        resources.acquire(Long.MAX_VALUE);
+        assertFalse(resources.canAcquire(1L << 20));
+        resources.release(Long.MAX_VALUE);
+        assertTrue(resources.canAcquire(300L << 20));
     }
 
     @Test void thousandsOfUnitsShareOneGlobalWorkerLimit() throws Exception {

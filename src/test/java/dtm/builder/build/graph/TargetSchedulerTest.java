@@ -5,9 +5,11 @@ import dtm.builder.build.TargetType;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -34,7 +36,7 @@ class TargetSchedulerTest {
         TargetGraph graph = TargetGraph.of(List.of(
                 target("app", "core"),
                 target("core")));
-        List<String> order = new java.util.ArrayList<>();
+        List<String> order = new ArrayList<>();
         TargetScheduler.Result r = TargetScheduler.run(graph, 1, t -> {
             order.add(t.id());
             return ok(t.id());
@@ -84,7 +86,7 @@ class TargetSchedulerTest {
                 target("core"),
                 target("util"),
                 target("app", "core", "util")));
-        Set<String> done = java.util.concurrent.ConcurrentHashMap.newKeySet();
+        Set<String> done = ConcurrentHashMap.newKeySet();
         ConcurrentLinkedQueue<String> violations = new ConcurrentLinkedQueue<>();
         TargetScheduler.Result r = TargetScheduler.run(graph, 4, t -> {
             for (String dep : t.dependsOn()) {

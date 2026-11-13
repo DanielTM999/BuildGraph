@@ -3,8 +3,11 @@ package dtm.builder.build;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dtm.builder.build.graph.ResolvedTarget;
 import dtm.builder.build.graph.TargetResolver;
+import dtm.builder.build.incremental.BuildStateStore;
+import dtm.builder.build.incremental.FileHasher;
 import dtm.builder.manifest.model.ManifestRootModel;
 import dtm.builder.repo.SafeZipExtractor;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -12,6 +15,8 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 public final class NativeArtifacts {
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -22,7 +27,7 @@ public final class NativeArtifacts {
         String identity;
         try { identity = project.toAbsolutePath().normalize().relativize(absolute).toString(); }
         catch (IllegalArgumentException differentRoot) { identity = absolute.toString(); }
-        return dtm.builder.build.incremental.FileHasher.hashCommand(List.of(identity)).substring(0, 32)
+        return FileHasher.hashCommand(List.of(identity)).substring(0, 32)
                 + (windows ? ".obj" : ".o");
     }
 
@@ -36,7 +41,7 @@ public final class NativeArtifacts {
         if (relative.isAbsolute() || relative.normalize().startsWith("..") || file.isBlank())
             throw new IllegalArgumentException("outputName deve estar dentro do diretorio de build: " + file);
         Path output = buildDir.resolve(relative).normalize();
-        String first = relative.normalize().getName(0).toString().toLowerCase(java.util.Locale.ROOT);
+        String first = relative.normalize().getName(0).toString().toLowerCase(Locale.ROOT);
         if (first.startsWith(".buildgraph") || first.equals(".obj") || first.equals(".clangd")
                 || output.toAbsolutePath().equals(buildDir.toAbsolutePath().normalize()))
             throw new IllegalArgumentException("outputName reservado: " + file);
@@ -97,17 +102,17 @@ public final class NativeArtifacts {
     }
 
     public static void clean(Path buildDir, ManifestRootModel root, ResolvedTarget target, boolean msvc) throws IOException {
-        clean(buildDir, root, target, msvc, java.util.Set.of());
+        clean(buildDir, root, target, msvc, Set.of());
     }
 
     public static void clean(Path buildDir, ManifestRootModel root, ResolvedTarget target, boolean msvc,
-                             java.util.Set<Path> preserved) throws IOException {
+                             Set<Path> preserved) throws IOException {
         Path base = buildDir.toAbsolutePath().normalize();
         List<Path> paths = new ArrayList<>();
         for (String stored : read(buildDir, target.id())) paths.add(base.resolve(stored).normalize());
         for (Path output : declaredOutputs(buildDir, root, target, msvc)) paths.add(output.toAbsolutePath().normalize());
         paths.add(base.resolve(".obj").resolve(target.id()).normalize());
-        paths.add(dtm.builder.build.incremental.BuildStateStore.stateFile(base, target.id()));
+        paths.add(BuildStateStore.stateFile(base, target.id()));
         paths.add(inventory(base, target.id()));
         for (Path path : paths) {
             if (!path.startsWith(base) || path.equals(base)) throw new IOException("Clean recusou caminho fora de build: " + path);

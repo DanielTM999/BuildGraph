@@ -1,12 +1,18 @@
 package dtm.builder.build;
 
 import dtm.builder.build.graph.ResolvedTarget;
+import dtm.builder.build.graph.TargetGraph;
+import dtm.builder.build.graph.TargetResolver;
+import dtm.builder.build.graph.TargetSelection;
 import dtm.builder.manifest.model.ManifestRootModel;
+import dtm.builder.manifest.model.ManifestTargetModel;
 import dtm.builder.repo.PathSanitizer;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public final class TestRunner {
 
@@ -76,9 +82,9 @@ public final class TestRunner {
             req.output().accept("Testes ignorados: " + (total - testSources.size()) + " arquivo(s)");
         }
         boolean msvc = req.toolchain() != null && req.toolchain().isMsvc();
-        dtm.builder.build.graph.TargetGraph selected;
+        TargetGraph selected;
         try {
-            selected = dtm.builder.build.graph.TargetSelection.resolve(manifest, req.projectPath(), msvc, req.onlyTargets());
+            selected = TargetSelection.resolve(manifest, req.projectPath(), msvc, req.onlyTargets());
         } catch (IllegalArgumentException e) {
             return BuildResult.fail(1, e.getMessage());
         }
@@ -87,9 +93,9 @@ public final class TestRunner {
         for (Path source : SourceCollector.collectSources(req.projectPath(), manifest.getSources(), !multi))
             if (!source.getFileName().toString().toLowerCase().startsWith("main.")) sources.add(source);
         String base = PathSanitizer.sanitizePackageFolderName(Artifacts.baseName(req.projectPath(), manifest)) + "_tests";
-        List<ResolvedTarget> allTargets = dtm.builder.build.graph.TargetResolver.resolve(manifest, req.projectPath(), msvc).targets();
-        java.util.Set<String> ids = new java.util.HashSet<>();
-        java.util.Set<Path> outputs = new java.util.HashSet<>();
+        List<ResolvedTarget> allTargets = TargetResolver.resolve(manifest, req.projectPath(), msvc).targets();
+        Set<String> ids = new HashSet<>();
+        Set<Path> outputs = new HashSet<>();
         for (ResolvedTarget existing : allTargets) {
             ids.add(existing.id());
             for (Path path : NativeArtifacts.declaredOutputs(req.buildDir(), manifest, existing, msvc)) outputs.add(path.toAbsolutePath().normalize());
@@ -98,7 +104,7 @@ public final class TestRunner {
         while (ids.contains(base) || outputs.contains(req.buildDir().resolve(testPlatform.fileName(base, TargetType.EXECUTABLE, msvc)).toAbsolutePath().normalize()))
             base += "_";
         String id = base;
-        var options = new dtm.builder.manifest.model.ManifestTargetModel();
+        var options = new ManifestTargetModel();
         options.setOutputName(TargetPlatform.resolve(manifest.getPlatform(), null).fileName(base, TargetType.EXECUTABLE, msvc));
         options.setAsmFormat("auto");
         List<String> dependencies = multi ? selected.targets().stream()
@@ -108,7 +114,7 @@ public final class TestRunner {
                 manifest.getCompileFlags(), manifest.getLinkFlags(), manifest.getLibraryPaths(), dependencies, false, options);
         List<ResolvedTarget> targets = new ArrayList<>(selected.targets());
         targets.add(suite);
-        var graph = dtm.builder.build.graph.TargetGraph.of(targets);
+        var graph = TargetGraph.of(targets);
         BuildResult compiled = NativeTargetBuilder.build(req, suite, graph, req.output());
         if (!compiled.success()) return compiled;
         TargetPlatform platform = TargetPlatform.resolve(manifest.getPlatform(), null);

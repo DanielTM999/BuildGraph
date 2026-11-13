@@ -3,6 +3,7 @@ package dtm.builder.build;
 import dtm.builder.build.graph.TargetGraph;
 import dtm.builder.build.graph.TargetResolver;
 import dtm.builder.build.graph.TargetScheduler;
+import dtm.builder.build.graph.TargetSelection;
 import dtm.builder.manifest.model.ManifestRootModel;
 
 import java.io.IOException;
@@ -10,7 +11,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public final class BuildExecutor {
 
@@ -38,7 +41,7 @@ public final class BuildExecutor {
     private static BuildResult directCompile(BuildRequest req, BuildRuntime runtime) {
         TargetGraph graph;
         try {
-            graph = dtm.builder.build.graph.TargetSelection.resolve(req.manifest(), req.projectPath(),
+            graph = TargetSelection.resolve(req.manifest(), req.projectPath(),
                     req.toolchain() != null && req.toolchain().isMsvc(), req.onlyTargets());
             Files.createDirectories(req.buildDir());
         } catch (IOException | IllegalArgumentException e) {
@@ -50,13 +53,13 @@ public final class BuildExecutor {
             return runtime.sources(target).size() + (singleStep ? 0 : 1);
         }).sum();
         runtime.output.accept("[0/" + total + "] Iniciando build");
-        java.util.concurrent.atomic.AtomicInteger completed = new java.util.concurrent.atomic.AtomicInteger();
+        AtomicInteger completed = new AtomicInteger();
         TargetScheduler.Result result = TargetScheduler.run(graph, runtime.scheduler.workers(), (target) -> {
             BuildResult built = NativeTargetBuilder.build(req, target, graph,
                     line -> runtime.output.accept("[" + target.id() + "] " + line),
                     (message, started) -> {
                         synchronized (completed) {
-                            String elapsed = started == 0 ? "" : String.format(java.util.Locale.ROOT, " (%.3f s)", (System.nanoTime() - started) / 1_000_000_000.0);
+                            String elapsed = started == 0 ? "" : String.format(Locale.ROOT, " (%.3f s)", (System.nanoTime() - started) / 1_000_000_000.0);
                             runtime.output.accept("[" + completed.incrementAndGet() + "/" + total + "] [" + target.id() + "] " + message + elapsed);
                         }
                     }, runtime);

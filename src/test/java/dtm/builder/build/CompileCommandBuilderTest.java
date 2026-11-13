@@ -4,6 +4,7 @@ import dtm.builder.manifest.model.ManifestRootModel;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -15,8 +16,8 @@ class CompileCommandBuilderTest {
         ManifestRootModel m = new ManifestRootModel();
         m.setName("app");
         m.setCxxStandard("cpp20");
-        m.setIncludes(new java.util.ArrayList<>(List.of("include")));
-        m.setDefines(new java.util.ArrayList<>(List.of("APP=1")));
+        m.setIncludes(new ArrayList<>(List.of("include")));
+        m.setDefines(new ArrayList<>(List.of("APP=1")));
         return m;
     }
 

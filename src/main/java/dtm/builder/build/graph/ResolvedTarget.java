@@ -1,6 +1,7 @@
 package dtm.builder.build.graph;
 
 import dtm.builder.build.TargetType;
+import dtm.builder.manifest.model.ManifestTargetModel;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,7 +18,7 @@ public record ResolvedTarget(
         List<String> libraryPaths,
         List<String> dependsOn,
         boolean synthetic,
-        dtm.builder.manifest.model.ManifestTargetModel options) {
+        ManifestTargetModel options) {
 
     public ResolvedTarget(String id, String name, TargetType type, List<String> sources,
                           List<String> includes, List<String> defines, List<String> compileFlags,

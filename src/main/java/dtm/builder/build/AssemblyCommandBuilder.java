@@ -1,16 +1,19 @@
 package dtm.builder.build;
 
 import dtm.builder.manifest.model.ManifestRootModel;
+
+import java.io.File;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public final class AssemblyCommandBuilder {
     private AssemblyCommandBuilder() { }
 
     public static String format(ManifestRootModel m, TargetPlatform platform) {
         return !NativeTools.specified(m.getAsmFormat()) || m.getAsmFormat().equalsIgnoreCase("auto")
-                ? platform.objectFormat() : m.getAsmFormat().trim().toLowerCase(java.util.Locale.ROOT);
+                ? platform.objectFormat() : m.getAsmFormat().trim().toLowerCase(Locale.ROOT);
     }
 
     public static List<String> build(NativeTools.Tool tool, TargetPlatform platform, ManifestRootModel m,
@@ -34,7 +37,7 @@ public final class AssemblyCommandBuilder {
         switch (tool.kind()) {
             case "nasm" -> {
                 cmd.addAll(List.of("-f", format));
-                for (Path inc : includes) cmd.add("-I" + inc + java.io.File.separator);
+                for (Path inc : includes) cmd.add("-I" + inc + File.separator);
                 for (String define : m.getDefines()) cmd.add("-D" + stripDefine(define));
             }
             case "gas" -> {

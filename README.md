@@ -92,7 +92,7 @@ BuildGraph executa `build`.
 | `-j`, `--jobs` | `auto` (default) ou limite global de compilações/links, limitado também pelas CPUs e pela RAM. `-j 1` = serial. |
 | `--memory-limit` | Teto de RAM estimada para processos de build (ex.: `8G`). |
 | `--memory-per-job` | Estimativa base por compilação (ex.: `768M`). |
-| `--memory-reserve` | Reserva para o SO; default: maior entre 512 MiB e 10% da RAM física. |
+| `--memory-reserve` | Reserva para o SO; default: 1/16 da RAM física, entre 512 MiB e 2 GiB. |
 | `--cache-dir`, `--cache-size` | Diretório dedicado e quota do cache de objetos (default: 5 GiB). |
 | `--no-cache` | Desabilita o cache compartilhado e preserva o incremental local. |
 | `--profile-build` | Emite métricas de performance no formato de saída selecionado. |
@@ -165,10 +165,15 @@ java -jar BuildGraph.jar . build --no-incremental --no-cache
 ```
 
 O modo automático usa as CPUs visíveis à JVM, memória física disponível e reserva do sistema.
-O teto do usuário pode reduzir o orçamento automático. A base conservadora é 256 MiB para C/ASM
-e 768 MiB para C++; fontes grandes e picos de RSS observados por unidade podem aumentá-la.
-Linux amostra RSS da árvore de processos por `/proc` e persiste os picos; Windows usa as estimativas
-conservadoras, pois Java não oferece RSS portátil. Sem métricas confiáveis, a admissão fica serial.
+A admissão consulta a memória disponível a cada unidade: uma nova compilação entra quando a sua
+estimativa, mais metade das estimativas das unidades em execução, cabe na memória disponível menos
+a reserva. Assim o paralelismo cresce quando o sistema libera memória e diminui sob pressão.
+`--memory-limit` limita a soma das estimativas em execução. Sem pico medido, a estimativa é
+256 MiB + 512 bytes por byte de fonte para C++ e 128 MiB + 256 bytes por byte para C/ASM
+(GCC 16 em `-O0`/`-O3` usa 145–360 MiB em fontes C++20 de 50–300 KiB). Linux amostra RSS da
+árvore de processos por `/proc` e persiste os picos; com pico medido, a estimativa passa a ser
+1,25× o pico. Windows usa a estimativa por tamanho, pois Java não oferece RSS portátil. Sem
+métricas confiáveis, a admissão fica serial.
 A fila não pula unidades grandes: uma unidade maior que o orçamento executa sozinha para permitir
 progresso. Estes limites controlam admissão e estimativas; não são limites rígidos impostos pelo SO.
 `--memory-reserve` permite ajustar explicitamente a reserva quando necessário. `K`, `M`, `G`, `T`,
@@ -185,9 +190,14 @@ Para GCC/Clang, a chave inclui fonte e headers transitivos por conteúdo, saída
 comando, arquitetura/ABI, identidade/versão da toolchain (incluindo componentes GCC), ambiente
 relevante e caminhos. O miss compila a mesma entrada pré-processada usada para a chave. Isso também
 resolve includes condicionais, arquivos gerados e novos headers que sombreiam outros includes.
-Variáveis de busca de ferramentas/includes, SDK, locale, reprodução e opções de compilador entram
-na assinatura; todas as variáveis explícitas de `env` também entram. Metadados de invocação sem
-relação com o compilador não invalidam objetos de drivers conhecidos. Para drivers personalizados,
+Variáveis de busca de ferramentas/includes, SDK, charset do locale (`LANG`, `LC_ALL`, `LC_CTYPE`),
+reprodução e opções de compilador entram na assinatura; todas as variáveis explícitas de `env`
+também entram. Metadados de invocação sem relação com o compilador (`TMP`, `TEMP`, `TMPDIR`,
+`LANGUAGE`, outros `LC_*`) não invalidam objetos de drivers conhecidos. Para GCC, quando a
+identidade da toolchain resolve e hasheia `cc1`, `cc1plus` e `as`, `PATH`/`PATHEXT` saem da
+assinatura (a identidade já cobre o que o `PATH` escolhe); no Windows o locale também sai, pois o
+GCC nativo não lê o charset de `LANG`. Trocar de shell (PowerShell, Git Bash, IDE) não recompila
+o projeto. Para drivers personalizados,
 todo o ambiente herdado entra na assinatura. Arquivos editados com tamanho/mtime preservados
 são detectados por conteúdo em cada build; os hashes são compartilhados apenas durante a execução.
 Os objetos locais também têm integridade verificada. Builds sem mudanças não regravam o estado.
@@ -770,7 +780,22 @@ No XML, `tasks` é o bloco da coleção e cada item usa o elemento `task`:
 
 São suportados placeholders como
 `${project.dir}`, `${project.id}`, `${project.version}`, `${env.NOME}`,
-`${properties.chave}` e `${profile.current.propriedade}`.
+`${properties.chave}`, `${profile.current.propriedade}` e `${profile.name}` (nome do profile
+ativo, como declarado no manifest; também `${profile.current.name}`).
+
+`"command": "${buildgraph.command}"` executa o próprio BuildGraph que está rodando o lifecycle
+(o launcher nativo ou `java -cp <jar> dtm.builder.Main`), sem depender do `PATH`. Exemplo de
+projeto auxiliar construído no mesmo profile antes dos testes:
+
+```json
+{
+  "id": "build-fixture",
+  "phase": "test",
+  "when": "before",
+  "command": "${buildgraph.command}",
+  "args": ["tests/fixtures/native", "build", "-p", "${profile.name}"]
+}
+```
 
 ## Compiladores e caminhos dos executáveis
 

@@ -3,10 +3,13 @@ package dtm.builder.build.cache;
 import dtm.builder.build.incremental.FileHasher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+
 import java.nio.file.*;
 import java.nio.file.attribute.FileTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class SharedObjectCacheTest {
@@ -36,7 +39,7 @@ class SharedObjectCacheTest {
         Path source = Files.writeString(temp.resolve("source.o"), "object".repeat(30_000));
         String digest = new FileHasher().sha256(source);
         try (var threads = Executors.newFixedThreadPool(8)) {
-            var tasks = new java.util.ArrayList<Callable<Void>>();
+            var tasks = new ArrayList<Callable<Void>>();
             for (int i = 0; i < 40; i++) {
                 int index = i;
                 tasks.add(() -> {

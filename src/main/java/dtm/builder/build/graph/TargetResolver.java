@@ -1,16 +1,22 @@
 package dtm.builder.build.graph;
 
 import dtm.builder.build.Artifacts;
+import dtm.builder.build.NativeArtifacts;
 import dtm.builder.build.TargetType;
+import dtm.builder.build.ToolProbe;
 import dtm.builder.manifest.ManifestMerge;
 import dtm.builder.manifest.model.ManifestRootModel;
 import dtm.builder.manifest.model.ManifestTargetModel;
+import dtm.builder.manifest.model.NativeOptions;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 public final class TargetResolver {
 
@@ -68,7 +74,7 @@ public final class TargetResolver {
                                                       ResolvedTarget target) {
         ManifestRootModel out = new ManifestRootModel();
         if (effective == null) effective = new ManifestRootModel();
-        dtm.builder.manifest.model.NativeOptions.merge(effective, target.options(), out);
+        NativeOptions.merge(effective, target.options(), out);
         out.setId(effective.getId());
         out.setName(target.name());
         out.setVersion(effective.getVersion());
@@ -152,21 +158,21 @@ public final class TargetResolver {
     private static void validateArtifactNames(List<ResolvedTarget> targets, ManifestRootModel root, boolean msvc,
                                               List<String> errors) {
         Map<String, String> byFile = new LinkedHashMap<>();
-        java.util.Set<String> ids = new java.util.HashSet<>();
+        Set<String> ids = new HashSet<>();
         for (ResolvedTarget t : targets) {
-            java.util.List<Path> files;
+            List<Path> files;
             try {
-                dtm.builder.build.NativeArtifacts.requireId(t.id());
-                String key = dtm.builder.build.ToolProbe.isWindows() ? t.id().toLowerCase(java.util.Locale.ROOT) : t.id();
+                NativeArtifacts.requireId(t.id());
+                String key = ToolProbe.isWindows() ? t.id().toLowerCase(Locale.ROOT) : t.id();
                 if (!ids.add(key)) errors.add("Ids de targets colidem no diretorio de build: " + t.id());
-                files = dtm.builder.build.NativeArtifacts.declaredOutputs(Path.of("build"), root, t, msvc);
+                files = NativeArtifacts.declaredOutputs(Path.of("build"), root, t, msvc);
             } catch (IllegalArgumentException e) {
                 errors.add(e.getMessage());
                 continue;
             }
             for (Path path : files) {
                 String file = path.toString();
-                if (dtm.builder.build.ToolProbe.isWindows()) file = file.toLowerCase(java.util.Locale.ROOT);
+                if (ToolProbe.isWindows()) file = file.toLowerCase(Locale.ROOT);
                 String other = byFile.putIfAbsent(file, t.id());
                 if (other != null && !other.equals(t.id())) {
                     errors.add("targets '" + other + "' e '" + t.id()

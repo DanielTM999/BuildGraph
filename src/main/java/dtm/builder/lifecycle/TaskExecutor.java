@@ -1,6 +1,8 @@
 package dtm.builder.lifecycle;
 
+import dtm.builder.Main;
 import dtm.builder.build.ProcessRunner;
+import dtm.builder.build.ToolProbe;
 import dtm.builder.manifest.model.ManifestRootModel;
 import dtm.builder.manifest.model.ManifestTaskModel;
 import dtm.builder.placeholder.PlaceholderResolver;
@@ -30,14 +32,17 @@ public final class TaskExecutor {
         PlaceholderResolver resolver = ctx.placeholders();
 
         for (ManifestTaskModel task : ordered) {
-            String command = resolver.resolve(task.getCommand());
-            if (command == null || command.isBlank()) {
-                ctx.output().accept("(task '" + task.identity() + "' sem command; ignorada)");
-                continue;
-            }
-
             List<String> cmd = new ArrayList<>();
-            cmd.add(command);
+            if (task.getCommand() != null && SELF_COMMAND.equals(task.getCommand().trim())) {
+                cmd.addAll(selfCommand());
+            } else {
+                String command = resolver.resolve(task.getCommand());
+                if (command == null || command.isBlank()) {
+                    ctx.output().accept("(task '" + task.identity() + "' sem command; ignorada)");
+                    continue;
+                }
+                cmd.add(command);
+            }
             cmd.addAll(resolver.resolveList(task.getArgs()));
 
             Path workingDir = resolveWorkingDir(ctx, resolver.resolve(task.getWorkingDir()));
@@ -51,6 +56,19 @@ public final class TaskExecutor {
             }
         }
         return true;
+    }
+
+    static final String SELF_COMMAND = "${buildgraph.command}";
+
+    static List<String> selfCommand() {
+        String launcher = System.getProperty("jpackage.app-path");
+        if (launcher != null && !launcher.isBlank()) {
+            return List.of(launcher);
+        }
+        Path java = Path.of(System.getProperty("java.home"), "bin",
+                ToolProbe.isWindows() ? "java.exe" : "java");
+        return List.of(java.toString(), "-cp", System.getProperty("java.class.path"),
+                Main.class.getName());
     }
 
     private static List<ManifestTaskModel> select(ManifestRootModel manifest, Phase phase,

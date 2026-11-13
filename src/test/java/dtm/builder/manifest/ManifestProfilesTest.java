@@ -3,6 +3,8 @@ package dtm.builder.manifest;
 import dtm.builder.manifest.model.ManifestRootModel;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -43,7 +45,7 @@ class ManifestProfilesTest {
         assertEquals("c++20", eff.getCompilerVersion());
         assertEquals("17.0.0", eff.getToolchainVersion());
 
-        assertEquals(java.util.List.of("extra/inc"), eff.getIncludes());
+        assertEquals(List.of("extra/inc"), eff.getIncludes());
 
         assertTrue(eff.getDefines().contains("APP=1"));
         assertTrue(eff.getDefines().contains("ARM=1"));
@@ -51,7 +53,7 @@ class ManifestProfilesTest {
         assertEquals("root", eff.getProperties().get("base"));
         assertEquals("embedded", eff.getProperties().get("flavor"));
 
-        assertEquals(java.util.List.of("repo/base", "repo/shared", "repo/arm"),
+        assertEquals(List.of("repo/base", "repo/shared", "repo/arm"),
                 eff.getRepositories());
 
         assertEquals(2, eff.getPackages().size());
@@ -80,6 +82,6 @@ class ManifestProfilesTest {
                 "{ \"platform\": \"host\", \"includes\": [\"inc\"] }", false).getManifest();
         ManifestRootModel eff = ManifestProfiles.effective(raw);
         assertEquals("host", eff.getPlatform());
-        assertEquals(java.util.List.of("inc"), eff.getIncludes());
+        assertEquals(List.of("inc"), eff.getIncludes());
     }
 }

@@ -1,10 +1,12 @@
 package dtm.builder.build;
 
 import dtm.builder.build.incremental.FileHasher;
+
 import java.io.IOException;
 import java.nio.channels.*;
 import java.nio.file.*;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -25,7 +27,7 @@ public final class BuildDirectoryLock implements AutoCloseable {
 
     public static BuildDirectoryLock acquire(Path directory) throws IOException {
         String path = directory.toFile().getCanonicalPath();
-        if (ToolProbe.isWindows()) path = path.toLowerCase(java.util.Locale.ROOT);
+        if (ToolProbe.isWindows()) path = path.toLowerCase(Locale.ROOT);
         String key = FileHasher.hashCommand(List.of(path));
         Local local = LOCAL.compute(key, (ignored, current) -> { if (current == null) current = new Local(); current.users++; return current; });
         boolean acquired = false;

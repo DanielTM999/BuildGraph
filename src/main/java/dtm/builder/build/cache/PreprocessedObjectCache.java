@@ -3,13 +3,18 @@ package dtm.builder.build.cache;
 import dtm.builder.build.*;
 import dtm.builder.build.incremental.*;
 import dtm.builder.manifest.model.ManifestRootModel;
+
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.function.Consumer;
+import java.util.regex.Pattern;
 
 public final class PreprocessedObjectCache {
     public record Prepared(String key, Path input, List<String> command, List<Path> dependencies,
@@ -28,9 +33,17 @@ public final class PreprocessedObjectCache {
     public String fingerprint(BuildRequest req, ManifestRootModel manifest, String executable, String environment) {
         return compilerIdentity(req, manifest, executable, environment);
     }
+    public boolean resolvesTools(BuildRequest req, ManifestRootModel manifest, String executable, String environment) {
+        return compilerIdentity(req, manifest, executable, environment) != null
+                && !clangCompilers.contains(executable + "|" + environment);
+    }
+    public void alias(String executable, String environment, String reduced) {
+        CompletableFuture<String> identity = compilers.get(executable + "|" + environment);
+        if (identity != null) compilers.putIfAbsent(executable + "|" + reduced, identity);
+    }
 
     public Prepared prepare(BuildRequest req, ManifestRootModel manifest, Path source, Path object,
-                            Path depfile, List<String> original, String environment, BuildMetrics metrics, java.util.function.Consumer<String> output) {
+                            Path depfile, List<String> original, String environment, BuildMetrics metrics, Consumer<String> output) {
         String extension = source.getFileName().toString().replaceFirst("^.*\\.", "").toLowerCase(Locale.ROOT);
 
         boolean cpp = !extension.equals("c") || source.getFileName().toString().endsWith(".C");
@@ -122,7 +135,7 @@ public final class PreprocessedObjectCache {
         if (prior != null) {
             try { return prior.get(); }
             catch (InterruptedException e) { Thread.currentThread().interrupt(); return null; }
-            catch (java.util.concurrent.ExecutionException e) { return null; }
+            catch (ExecutionException e) { return null; }
         }
         try {
             List<String> pieces = new ArrayList<>();
@@ -162,7 +175,7 @@ public final class PreprocessedObjectCache {
     static String preprocessedHash(Path input, Path mappedRoot) throws IOException {
         MessageDigest digest;
         try { digest = MessageDigest.getInstance("SHA-256"); }
-        catch (java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
+        catch (NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
         try (BufferedReader reader = Files.newBufferedReader(input, StandardCharsets.UTF_8)) {
             String line;
             AsmSafety assembly = new AsmSafety();
@@ -185,7 +198,7 @@ public final class PreprocessedObjectCache {
     }
 
     private static final class AsmSafety {
-        private static final java.util.regex.Pattern ASM = java.util.regex.Pattern.compile("\\b(?:asm|__asm|__asm__)\\b");
+        private static final Pattern ASM = Pattern.compile("\\b(?:asm|__asm|__asm__)\\b");
         private final StringBuilder clause = new StringBuilder();
         private boolean collecting, opened, quoted, escaped, expectTemplate;
         private int depth;

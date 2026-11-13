@@ -2,20 +2,24 @@ package dtm.builder.build.incremental;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class FileHasher {
 
-    private record Snapshot(long size, java.nio.file.attribute.FileTime modified,
-                            java.nio.file.attribute.FileTime created, Object fileKey, String hash) { }
-    private final java.util.concurrent.ConcurrentHashMap<Path, Snapshot> hashes = new java.util.concurrent.ConcurrentHashMap<>();
+    private record Snapshot(long size, FileTime modified,
+                            FileTime created, Object fileKey, String hash) { }
+    private final ConcurrentHashMap<Path, Snapshot> hashes = new ConcurrentHashMap<>();
 
     static final long RACY_WINDOW_MILLIS = 2000;
     static final String RACY = "racy";
@@ -59,11 +63,11 @@ public final class FileHasher {
                     if (previous != null && previous.size() == attrs.size()
                             && previous.modified().equals(attrs.lastModifiedTime())
                             && previous.created().equals(attrs.creationTime())
-                            && java.util.Objects.equals(previous.fileKey(), attrs.fileKey())) return previous;
+                            && Objects.equals(previous.fileKey(), attrs.fileKey())) return previous;
                     return new Snapshot(attrs.size(), attrs.lastModifiedTime(), attrs.creationTime(), attrs.fileKey(), digestFile(key));
-                } catch (IOException e) { throw new java.io.UncheckedIOException(e); }
+                } catch (IOException e) { throw new UncheckedIOException(e); }
             }).hash();
-        } catch (java.io.UncheckedIOException e) { throw e.getCause(); }
+        } catch (UncheckedIOException e) { throw e.getCause(); }
     }
 
     public void invalidate(Path file) { hashes.remove(file.toAbsolutePath().normalize()); }

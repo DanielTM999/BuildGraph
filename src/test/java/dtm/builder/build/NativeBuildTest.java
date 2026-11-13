@@ -2,16 +2,21 @@ package dtm.builder.build;
 
 import dtm.builder.UserArgs;
 import dtm.builder.build.graph.TargetSelection;
+import dtm.builder.integration.CompilationDatabaseGenerator;
 import dtm.builder.manifest.ManifestParser;
 import dtm.builder.manifest.ManifestProfiles;
 import dtm.builder.manifest.model.ManifestRootModel;
 import dtm.builder.manifest.model.ManifestTargetModel;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class NativeBuildTest {
@@ -19,7 +24,7 @@ class NativeBuildTest {
 
     static final class FakeTools implements ProcessExecutor {
         final List<List<String>> commands = new ArrayList<>();
-        @Override public int run(List<String> cmd, Path cwd, java.util.Map<String,String> env, java.util.function.Consumer<String> out) {
+        @Override public int run(List<String> cmd, Path cwd, Map<String,String> env, Consumer<String> out) {
             commands.add(List.copyOf(cmd));
             try {
                 Path output = null;
@@ -256,7 +261,7 @@ class NativeBuildTest {
 
     @Test void assemblyOnlyCompilationDatabaseNeedsNoCCompiler() throws Exception {
         var m = manifest(); m.setTargets(List.of(target("boot", "object", "boot.asm")));
-        assertEquals("[]", dtm.builder.integration.CompilationDatabaseGenerator.generate(project, m,
+        assertEquals("[]", CompilationDatabaseGenerator.generate(project, m,
                 null, project.resolve("packages"), project.resolve("build"), "Debug"));
     }
 

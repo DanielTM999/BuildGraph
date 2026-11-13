@@ -12,8 +12,12 @@ import dtm.builder.repo.SyncResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.EnumSet;
 import java.util.Set;
+import java.util.jar.Manifest;
 
 public final class CommandDispatcher {
 
@@ -148,7 +152,7 @@ public final class CommandDispatcher {
                 return;
             }
     
-            var manifest = new java.util.jar.Manifest(stream);
+            var manifest = new Manifest(stream);
             var attributes = manifest.getMainAttributes();
     
             String buildTime = attributes.getValue("Build-Time");
@@ -170,11 +174,11 @@ public final class CommandDispatcher {
             }
     
             if (buildTime != null) {
-                var instant = java.time.Instant.parse(buildTime);
+                var instant = Instant.parse(buildTime);
     
                 var date = instant
-                        .atZone(java.time.ZoneId.systemDefault())
-                        .format(java.time.format.DateTimeFormatter
+                        .atZone(ZoneId.systemDefault())
+                        .format(DateTimeFormatter
                                 .ofPattern("yyyy-MM-dd HH:mm:ss z"));
     
                 printer.println(Severity.NONE, "Build date: {}", date);

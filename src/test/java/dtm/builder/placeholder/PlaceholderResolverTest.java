@@ -49,6 +49,15 @@ class PlaceholderResolverTest {
     }
 
     @Test
+    void resolvesActiveProfileName() {
+        PlaceholderResolver r = resolver();
+        assertEquals("dev", r.resolve("${profile.name}"));
+        assertEquals("dev", r.resolve("${profile.current.name}"));
+        assertEquals("dev", r.resolve("${profile.DEV.name}"));
+        assertEquals("build -p dev", r.resolve("build -p ${profile.name}"));
+    }
+
+    @Test
     void resolvesEnvAndMixedString() {
         PlaceholderResolver r = resolver();
         assertEquals("xyz", r.resolve("${env.MYVAR}"));

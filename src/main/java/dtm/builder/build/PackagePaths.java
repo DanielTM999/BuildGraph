@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Stream;
 
 public final class PackagePaths {
@@ -97,7 +98,7 @@ public final class PackagePaths {
     }
 
     private static boolean isLinkInput(Path path) {
-        String name = path.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+        String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
         return name.endsWith(".a") || name.endsWith(".lib") || name.endsWith(".dll")
                 || name.endsWith(".dylib") || name.endsWith(".so")
                 || name.contains(".so.");

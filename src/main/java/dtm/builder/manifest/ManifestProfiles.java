@@ -2,6 +2,7 @@ package dtm.builder.manifest;
 
 import dtm.builder.manifest.model.ManifestProfileModel;
 import dtm.builder.manifest.model.ManifestRootModel;
+import dtm.builder.manifest.model.NativeOptions;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -19,7 +20,7 @@ public final class ManifestProfiles {
 
         ManifestProfileModel profile = activeProfile(raw);
         ManifestRootModel out = new ManifestRootModel();
-        dtm.builder.manifest.model.NativeOptions.merge(raw, profile, out);
+        NativeOptions.merge(raw, profile, out);
 
         out.setId(raw.getId());
         out.setName(raw.getName());

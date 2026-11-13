@@ -28,6 +28,24 @@ Todas as mudanças relevantes serão documentadas neste arquivo. O formato segue
 - `refresh` passa a atualizar o lock implicitamente.
 - Build incremental relinka quando bibliotecas precompiladas de packages mudam.
 
+## [1.1.6] - 2026-11-13
+
+### Adicionado
+
+- Placeholder `${profile.name}` (e `${profile.current.name}`) com o nome do profile ativo.
+- `"command": "${buildgraph.command}"` em tasks executa o próprio BuildGraph, sem depender do `PATH`.
+
+### Alterado
+
+- Admissão de compilações pela memória disponível a cada unidade, em vez de um orçamento fixado no
+  início; reserva padrão de 1/16 da RAM (entre 512 MiB e 2 GiB).
+- Estimativa de memória por unidade calibrada (C++: 256 MiB + 512 bytes por byte de fonte) e pico
+  medido usado diretamente quando existe.
+- `PATH`/`PATHEXT` saem da assinatura incremental e do cache quando a identidade do GCC cobre as
+  ferramentas; `TMP`, `TEMP`, `TMPDIR`, `LANGUAGE` e `LC_*` sem efeito no objeto saem sempre.
+  Trocar de shell não recompila mais o projeto.
+- Código usa imports em vez de nomes totalmente qualificados.
+
 ## [1.1.5] - 2026-11-06
 
 ### Adicionado

@@ -1,22 +1,34 @@
 package dtm.builder.build;
 
+import dtm.builder.build.cache.PreprocessedObjectCache;
 import dtm.builder.build.graph.ResolvedTarget;
 import dtm.builder.build.graph.TargetGraph;
 import dtm.builder.build.graph.TargetResolver;
 import dtm.builder.build.incremental.DepFileParser;
+import dtm.builder.build.incremental.FileHasher;
 import dtm.builder.build.incremental.IncrementalBuildService;
 import dtm.builder.build.incremental.MsvcIncludeParser;
 import dtm.builder.build.incremental.TargetState;
 import dtm.builder.manifest.ManifestMerge;
 import dtm.builder.manifest.model.ManifestRootModel;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 public final class NativeTargetBuilder {
@@ -28,7 +40,7 @@ public final class NativeTargetBuilder {
     }
 
     public static BuildResult build(BuildRequest req, ResolvedTarget target, TargetGraph graph,
-                                    Consumer<String> out, java.util.function.BiConsumer<String, Long> progress) {
+                                    Consumer<String> out, BiConsumer<String, Long> progress) {
         try {
             try (BuildRuntime runtime = new BuildRuntime(req)) {
                 return execute(req, target, graph, runtime.serialize(out), runtime.serialize(progress), runtime);
@@ -39,7 +51,7 @@ public final class NativeTargetBuilder {
     }
 
     static BuildResult build(BuildRequest req, ResolvedTarget target, TargetGraph graph,
-                             Consumer<String> out, java.util.function.BiConsumer<String, Long> progress,
+                             Consumer<String> out, BiConsumer<String, Long> progress,
                              BuildRuntime runtime) {
         try { return execute(req, target, graph, runtime.serialize(out), runtime.serialize(progress), runtime); }
         catch (IOException | IllegalArgumentException e) {
@@ -48,7 +60,7 @@ public final class NativeTargetBuilder {
     }
 
     private static BuildResult execute(BuildRequest req, ResolvedTarget target, TargetGraph graph,
-                                        Consumer<String> out, java.util.function.BiConsumer<String, Long> progress, BuildRuntime runtime) throws IOException {
+                                        Consumer<String> out, BiConsumer<String, Long> progress, BuildRuntime runtime) throws IOException {
         long analysisStarted = runtime.metrics.start();
         NativeArtifacts.requireId(target.id());
         ManifestRootModel m = TargetResolver.perTargetManifest(req.manifest(), target);
@@ -63,7 +75,7 @@ public final class NativeTargetBuilder {
         List<Path> sources = runtime.sources(target);
         if (sources.isEmpty()) throw new IllegalArgumentException("Nenhuma fonte C/C++/ASM encontrada");
         boolean exclusiveUnits = sources.stream().anyMatch(source -> source.toString().matches("(?i).*\\.(cppm|ixx|mpp|ccm|cxxm)$"))
-                || m.getCompileFlags().stream().map(flag -> flag.toLowerCase(java.util.Locale.ROOT))
+                || m.getCompileFlags().stream().map(flag -> flag.toLowerCase(Locale.ROOT))
                 .anyMatch(flag -> flag.contains("module") || flag.contains("pch") || flag.startsWith("/yc")
                         || flag.startsWith("/yu") || flag.startsWith("/fp"));
         boolean flat = target.type() == TargetType.BINARY && "bin".equals(AssemblyCommandBuilder.format(m, platform));
@@ -73,7 +85,7 @@ public final class NativeTargetBuilder {
             throw new IllegalArgumentException("asmFormat bin requer uma fonte NASM");
         if (!flat && "bin".equals(AssemblyCommandBuilder.format(m, platform)))
             throw new IllegalArgumentException("asmFormat bin requer type binary");
-        String mode = NativeTools.specified(m.getLinkMode()) ? m.getLinkMode().toLowerCase(java.util.Locale.ROOT) : "auto";
+        String mode = NativeTools.specified(m.getLinkMode()) ? m.getLinkMode().toLowerCase(Locale.ROOT) : "auto";
         if (!List.of("auto", "driver", "linker").contains(mode)) throw new IllegalArgumentException("linkMode invalido: " + mode);
 
         List<ResolvedTarget> linkedDeps = linkDependencies(graph, target);
@@ -128,7 +140,7 @@ public final class NativeTargetBuilder {
         if (linker != null) fingerprint.append(runtime.toolFingerprint(linker.executable()));
         fingerprint.append(runtime.toolFingerprint(archive)).append(runtime.toolFingerprint(objcopy));
         fingerprint.append(runtime.compilerFingerprint(compiler, m));
-        String environment = runtime.environment(m.getEnv(), compiler);
+        String environment = runtime.environment(m, compiler);
         IncrementalBuildService incremental = new IncrementalBuildService(req.buildDir(), compiler, req.buildMode(), req.incremental(), fingerprint + "|env=" + environment + "|includes=" + runtime.includeNamespace(m, sources, packages.includeDirs()), runtime.hasher);
         TargetState state = incremental.begin(target.id());
         runtime.metrics.elapsed("analysis", analysisStarted);
@@ -142,7 +154,7 @@ public final class NativeTargetBuilder {
         NativeArtifacts.record(req.buildDir(), target.id(), owned);
         try {
             List<Path> objects = new ArrayList<>();
-            List<java.util.concurrent.CompletableFuture<BuildResult>> pending = new ArrayList<>();
+            List<CompletableFuture<BuildResult>> pending = new ArrayList<>();
             boolean drained = false;
             try {
                 for (Path source : sources) {
@@ -184,7 +196,7 @@ public final class NativeTargetBuilder {
                     final ManifestRootModel unitManifest = m;
                     final List<String> unitPreprocess = preprocess, unitDependencyScan = dependencyScan;
                     long estimate = exclusiveUnits ? Long.MAX_VALUE : ResourceManager.estimate(source, req.options().memoryPerJob(),
-                            runtime.history.peak(dtm.builder.build.incremental.FileHasher.hashCommand(signature)));
+                            runtime.history.peak(FileHasher.hashCommand(signature)));
                     pending.add(runtime.scheduler.submit(estimate, true,
                             () -> {
                                 try {
@@ -214,7 +226,7 @@ public final class NativeTargetBuilder {
                     while (!done) {
                         try { future.get(); done = true; }
                         catch (InterruptedException e) { interrupted = true; runtime.scheduler.cancel(); }
-                        catch (java.util.concurrent.ExecutionException | java.util.concurrent.CancellationException e) { done = true; }
+                        catch (ExecutionException | CancellationException e) { done = true; }
                     }
                 }
                 if (interrupted) Thread.currentThread().interrupt();
@@ -285,10 +297,10 @@ public final class NativeTargetBuilder {
             boolean flat, boolean msvc, NativeTools.Tool asm, Path source, Path object, Path depFile, Path ppDep,
             List<String> preprocess, List<String> dependencyScan, List<String> command, List<String> signature,
             IncrementalBuildService incremental, TargetState state, Consumer<String> out,
-            java.util.function.BiConsumer<String, Long> progress, BuildRuntime runtime, String environment) throws IOException {
+            BiConsumer<String, Long> progress, BuildRuntime runtime, String environment) throws IOException {
         long compiling = runtime.metrics.start();
         ProcessRunner.beginMemoryTracking();
-        dtm.builder.build.cache.PreprocessedObjectCache.Prepared cached = null;
+        PreprocessedObjectCache.Prepared cached = null;
         try {
             incremental.invalidateObject(state, source);
             runtime.hasher.invalidate(object);
@@ -359,13 +371,13 @@ public final class NativeTargetBuilder {
             return BuildResult.ok(0, object, "Compilado " + source);
         } finally {
             if (cached != null) cached.close();
-            runtime.history.record(dtm.builder.build.incremental.FileHasher.hashCommand(signature), ProcessRunner.peakMemoryBytes());
+            runtime.history.record(FileHasher.hashCommand(signature), ProcessRunner.peakMemoryBytes());
             runtime.metrics.elapsed("unit_total", compiling);
         }
     }
 
-    private static boolean inputsStable(dtm.builder.build.cache.PreprocessedObjectCache.Prepared input, Path source) throws IOException {
-        if (!new dtm.builder.build.incremental.FileHasher().sha256(source).equals(input.sourceHash())) return false;
+    private static boolean inputsStable(PreprocessedObjectCache.Prepared input, Path source) throws IOException {
+        if (!new FileHasher().sha256(source).equals(input.sourceHash())) return false;
         for (Path dependency : input.dependencies())
             if (Files.getLastModifiedTime(dependency).toMillis() > input.scanStartedMillis()) return false;
         return true;
@@ -377,12 +389,12 @@ public final class NativeTargetBuilder {
         return Math.min(4L << 30, bytes * 3);
     }
 
-    private static BuildResult await(java.util.concurrent.CompletableFuture<BuildResult> future, BuildRuntime runtime) {
+    private static BuildResult await(CompletableFuture<BuildResult> future, BuildRuntime runtime) {
         return await(future.exceptionally(error -> BuildResult.fail(1, "Falha na unidade de compilacao: " + error)),
                 runtime, BuildResult.fail(1, "Compilacao cancelada ou falhou"));
     }
 
-    private static <T> T await(java.util.concurrent.CompletableFuture<T> future, BuildRuntime runtime, T failure) {
+    private static <T> T await(CompletableFuture<T> future, BuildRuntime runtime, T failure) {
         try { return future.get(); }
         catch (InterruptedException e) {
             runtime.scheduler.cancel();
@@ -390,12 +402,12 @@ public final class NativeTargetBuilder {
             while (!done) {
                 try { future.get(); done = true; }
                 catch (InterruptedException again) { }
-                catch (java.util.concurrent.ExecutionException | java.util.concurrent.CancellationException failed) { done = true; }
+                catch (ExecutionException | CancellationException failed) { done = true; }
             }
             Thread.currentThread().interrupt();
             return failure;
         }
-        catch (java.util.concurrent.ExecutionException | java.util.concurrent.CancellationException e) {
+        catch (ExecutionException | CancellationException e) {
             runtime.scheduler.cancel(); return failure;
         }
     }
@@ -418,20 +430,20 @@ public final class NativeTargetBuilder {
 
     public static List<ResolvedTarget> linkDependencies(TargetGraph graph, ResolvedTarget target) {
         LinkedHashMap<String, ResolvedTarget> out = new LinkedHashMap<>();
-        collect(graph, target, false, out, new java.util.HashSet<>());
-        java.util.Set<String> absorbedObjects = new java.util.HashSet<>();
+        collect(graph, target, false, out, new HashSet<>());
+        Set<String> absorbedObjects = new HashSet<>();
         for (ResolvedTarget dep : out.values()) if (dep.type() == TargetType.STATIC || dep.type() == TargetType.SHARED)
             for (ResolvedTarget nested : usageDependencies(graph, dep))
                 if (nested.type() == TargetType.OBJECT) absorbedObjects.add(nested.id());
         absorbedObjects.forEach(out::remove);
         List<ResolvedTarget> ordered = new ArrayList<>(graph.topologicalOrder());
-        java.util.Collections.reverse(ordered);
+        Collections.reverse(ordered);
         return ordered.stream().filter(t -> out.containsKey(t.id())).toList();
     }
 
     private static List<ResolvedTarget> usageDependencies(TargetGraph graph, ResolvedTarget target) {
         Map<String, ResolvedTarget> found = new LinkedHashMap<>();
-        java.util.ArrayDeque<String> pending = new java.util.ArrayDeque<>(target.dependsOn());
+        ArrayDeque<String> pending = new ArrayDeque<>(target.dependsOn());
         while (!pending.isEmpty()) {
             ResolvedTarget dep = graph.target(pending.removeFirst());
             if (dep == null || !(dep.type().isLibrary() || dep.type() == TargetType.OBJECT)
@@ -441,7 +453,7 @@ public final class NativeTargetBuilder {
         return new ArrayList<>(found.values());
     }
     private static void collect(TargetGraph graph, ResolvedTarget target, boolean absorbed,
-                                Map<String, ResolvedTarget> out, java.util.Set<String> seen) {
+                                Map<String, ResolvedTarget> out, Set<String> seen) {
         for (String id : target.dependsOn()) {
             ResolvedTarget dep = graph.target(id);
             if (dep == null || !seen.add(id + ":" + absorbed)) continue;

@@ -1,5 +1,6 @@
 package dtm.builder.build;
 
+import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
@@ -47,7 +48,7 @@ public final class ToolProbe {
                 candidates.add(executable + ext);
             }
         }
-        for (String dir : pathEnv.split(java.io.File.pathSeparator)) {
+        for (String dir : pathEnv.split(File.pathSeparator)) {
             if (dir.isBlank()) {
                 continue;
             }

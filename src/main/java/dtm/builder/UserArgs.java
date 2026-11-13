@@ -1,6 +1,12 @@
 package dtm.builder;
 
+import dtm.builder.build.BuildOptions;
+
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -164,20 +170,20 @@ public final class UserArgs {
         return flag(SKIP_TESTS);
     }
 
-    public java.util.List<String> getSkippedTests() {
+    public List<String> getSkippedTests() {
         return list(SKIPPED_TESTS);
     }
 
-    public java.util.List<String> getTargets() {
+    public List<String> getTargets() {
         return list(TARGETS);
     }
 
-    private java.util.List<String> list(String key) {
+    private List<String> list(String key) {
         String raw = argsMap.getOrDefault(key, "");
         if (raw.isBlank()) {
-            return java.util.List.of();
+            return List.of();
         }
-        java.util.List<String> out = new java.util.ArrayList<>();
+        List<String> out = new ArrayList<>();
         for (String part : raw.split(",")) {
             if (!part.isBlank()) {
                 out.add(part.trim());
@@ -206,15 +212,15 @@ public final class UserArgs {
         return Collections.unmodifiableMap(argsMap);
     }
 
-    public dtm.builder.build.BuildOptions getBuildOptions() {
-        var defaults = dtm.builder.build.BuildOptions.defaults();
-        return new dtm.builder.build.BuildOptions(size("--memory-limit", 0), size("--memory-per-job", 0),
-                argsMap.containsKey("--cache-dir") ? java.nio.file.Path.of(argsMap.get("--cache-dir")) : defaults.cacheDirectory(),
+    public BuildOptions getBuildOptions() {
+        var defaults = BuildOptions.defaults();
+        return new BuildOptions(size("--memory-limit", 0), size("--memory-per-job", 0),
+                argsMap.containsKey("--cache-dir") ? Path.of(argsMap.get("--cache-dir")) : defaults.cacheDirectory(),
                 size("--cache-size", defaults.cacheSize()), !flag("--no-cache"), flag("--profile-build"), size("--memory-reserve", 0));
     }
 
     private long size(String key, long fallback) {
-        return argsMap.containsKey(key) ? dtm.builder.build.BuildOptions.bytes(argsMap.get(key)) : fallback;
+        return argsMap.containsKey(key) ? BuildOptions.bytes(argsMap.get(key)) : fallback;
     }
 
     private boolean flag(String key) {
@@ -270,8 +276,8 @@ public final class UserArgs {
                     i = readValue(args, i, arg);
                     try {
                         if (argsMap.get(arg).isBlank()) throw new IllegalArgumentException(arg + " requer um valor");
-                        if (!arg.equals("--cache-dir")) dtm.builder.build.BuildOptions.bytes(argsMap.get(arg));
-                        else java.nio.file.Path.of(argsMap.get(arg));
+                        if (!arg.equals("--cache-dir")) BuildOptions.bytes(argsMap.get(arg));
+                        else Path.of(argsMap.get(arg));
                     } catch (IllegalArgumentException e) { invalid(e.getMessage()); }
                 }
                 case "--compile-commands", "--clangd", "--compdb" ->
@@ -316,7 +322,7 @@ public final class UserArgs {
 
     private int appendValue(String[] args, int index, String key, String error) {
         if (hasValue(args, index)) {
-            if (java.util.Arrays.stream(args[index + 1].split(",", -1)).allMatch(String::isBlank)) {
+            if (Arrays.stream(args[index + 1].split(",", -1)).allMatch(String::isBlank)) {
                 invalid(error);
                 return index + 1;
             }

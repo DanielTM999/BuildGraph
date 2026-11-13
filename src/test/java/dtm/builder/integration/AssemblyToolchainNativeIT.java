@@ -1,14 +1,17 @@
 package dtm.builder.integration;
 
 import dtm.builder.build.*;
+import dtm.builder.manifest.ManifestParser;
 import dtm.builder.manifest.model.ManifestRootModel;
 import dtm.builder.manifest.model.ManifestTargetModel;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -126,7 +129,7 @@ class AssemblyToolchainNativeIT {
         var boot = target("boot", "binary", "boot.asm"); boot.setAsmFormat("bin");
         var other = target("other", "object", "other.asm"); other.setAsmKind("unavailable");
         m.setTargets(List.of(boot, other));
-        dtm.builder.manifest.ManifestParser.write(m, project.resolve("Manifest.json"));
+        ManifestParser.write(m, project.resolve("Manifest.json"));
         Path jar = Path.of("target/BuildGraph.jar").toAbsolutePath();
         assertTrue(Files.isRegularFile(jar), "Execute pela fase verify");
         Path java = Path.of(System.getProperty("java.home"), "bin", ToolProbe.isWindows() ? "java.exe" : "java");

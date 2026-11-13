@@ -1,18 +1,40 @@
 package dtm.builder.build;
 
+import dtm.builder.build.cache.PreprocessedObjectCache;
+import dtm.builder.build.cache.SharedObjectCache;
 import dtm.builder.build.graph.ResolvedTarget;
+import dtm.builder.build.incremental.CompilerFingerprint;
 import dtm.builder.build.incremental.FileHasher;
+import dtm.builder.manifest.model.ManifestRootModel;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.FileVisitOption;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 final class BuildRuntime implements AutoCloseable {
     final BuildMetrics metrics;
     final ResourceManager resources;
     final CompilationScheduler scheduler;
     final FileHasher hasher = new FileHasher();
-    final dtm.builder.build.cache.PreprocessedObjectCache cache;
+    final PreprocessedObjectCache cache;
     final MemoryHistory history;
     private final BuildDirectoryLock directoryLock;
     private final BuildRequest request;
@@ -25,20 +47,20 @@ final class BuildRuntime implements AutoCloseable {
         this.request = request;
         output = serialize(request.output());
         try { directoryLock = BuildDirectoryLock.acquire(request.buildDir()); }
-        catch (java.io.IOException e) { throw new IllegalArgumentException(e.getMessage(), e); }
+        catch (IOException e) { throw new IllegalArgumentException(e.getMessage(), e); }
         metrics = new BuildMetrics(request.options().profile());
         resources = new ResourceManager(request.jobs(), request.options());
         scheduler = new CompilationScheduler(resources, metrics);
-        cache = new dtm.builder.build.cache.PreprocessedObjectCache(
-                new dtm.builder.build.cache.SharedObjectCache(request.options().cacheDirectory(), request.options().cacheSize()), hasher);
+        cache = new PreprocessedObjectCache(
+                new SharedObjectCache(request.options().cacheDirectory(), request.options().cacheSize()), hasher);
         history = new MemoryHistory(request.options().cacheDirectory().resolveSibling("memory-history.properties"));
     }
 
-    java.util.function.Consumer<String> serialize(java.util.function.Consumer<String> consumer) {
+    Consumer<String> serialize(Consumer<String> consumer) {
         return line -> { synchronized (outputLock) { if (consumer != null) consumer.accept(line); } };
     }
 
-    java.util.function.BiConsumer<String, Long> serialize(java.util.function.BiConsumer<String, Long> consumer) {
+    BiConsumer<String, Long> serialize(BiConsumer<String, Long> consumer) {
         return (message, started) -> { synchronized (outputLock) { consumer.accept(message, started); } };
     }
 
@@ -50,26 +72,39 @@ final class BuildRuntime implements AutoCloseable {
         });
     }
 
-    String environment(java.util.Map<String, String> overrides) {
+    String environment(Map<String, String> overrides) {
         return BuildEnvironment.signature(System.getenv(), overrides);
     }
 
-    String environment(java.util.Map<String, String> overrides, Toolchain compiler) {
+    String environment(Map<String, String> overrides, Toolchain compiler) {
 
         return compiler != null && compiler.kind() == ToolchainKind.CUSTOM
                 ? BuildEnvironment.customSignature(System.getenv(), overrides) : environment(overrides);
     }
 
-    String toolFingerprint(Path executable) {
-        if (executable == null) return "-";
-        try { return dtm.builder.build.incremental.CompilerFingerprint.describe(executable) + ":" + hasher.sha256(executable); }
-        catch (java.io.IOException e) { return dtm.builder.build.incremental.CompilerFingerprint.describe(executable); }
+    String environment(ManifestRootModel manifest, Toolchain compiler) {
+        String full = environment(manifest.getEnv(), compiler);
+        if (compiler == null || compiler.isMsvc() || compiler.kind() == ToolchainKind.CUSTOM
+                || request.executor() != ProcessExecutor.REAL) return full;
+        List<String> drivers = Stream.of(compiler.cc(), compiler.cxx())
+                .filter(Objects::nonNull).distinct().map(Path::toString).toList();
+        for (String driver : drivers)
+            if (!cache.resolvesTools(request, manifest, driver, full)) return full;
+        String reduced = BuildEnvironment.resolvedToolSignature(System.getenv(), manifest.getEnv(), ToolProbe.isWindows());
+        for (String driver : drivers) cache.alias(driver, full, reduced);
+        return reduced;
     }
 
-    String compilerFingerprint(Toolchain compiler, dtm.builder.manifest.model.ManifestRootModel manifest) {
+    String toolFingerprint(Path executable) {
+        if (executable == null) return "-";
+        try { return CompilerFingerprint.describe(executable) + ":" + hasher.sha256(executable); }
+        catch (IOException e) { return CompilerFingerprint.describe(executable); }
+    }
+
+    String compilerFingerprint(Toolchain compiler, ManifestRootModel manifest) {
         if (compiler == null) return "none";
-        var fingerprints = new java.util.ArrayList<String>();
-        for (Path driver : java.util.stream.Stream.of(compiler.cc(), compiler.cxx()).filter(java.util.Objects::nonNull).distinct().toList()) {
+        var fingerprints = new ArrayList<String>();
+        for (Path driver : Stream.of(compiler.cc(), compiler.cxx()).filter(Objects::nonNull).distinct().toList()) {
             String value = request.executor() == ProcessExecutor.REAL && !compiler.isMsvc()
                     ? cache.fingerprint(request, manifest, driver.toString(), environment(manifest.getEnv(), compiler)) : null;
             fingerprints.add(value == null ? toolFingerprint(driver) : value);
@@ -85,8 +120,8 @@ final class BuildRuntime implements AutoCloseable {
     }
 
     private final ConcurrentHashMap<Path, String> namespaces = new ConcurrentHashMap<>();
-    String includeNamespace(dtm.builder.manifest.model.ManifestRootModel manifest, List<Path> units, List<Path> packages) {
-        var roots = new java.util.TreeSet<Path>();
+    String includeNamespace(ManifestRootModel manifest, List<Path> units, List<Path> packages) {
+        var roots = new TreeSet<Path>();
         for (String include : manifest.getIncludes()) roots.add(request.projectPath().resolve(include).toAbsolutePath().normalize());
         roots.addAll(packages);
         for (Path source : units) roots.add(source.toAbsolutePath().getParent());
@@ -94,20 +129,20 @@ final class BuildRuntime implements AutoCloseable {
         for (int i = 0; i < flags.size(); i++) {
             String arg = flags.get(i);
             String include = null;
-            if (java.util.List.of("-I", "-isystem", "-iquote", "-idirafter", "/I").contains(arg) && i + 1 < flags.size()) include = flags.get(++i);
+            if (List.of("-I", "-isystem", "-iquote", "-idirafter", "/I").contains(arg) && i + 1 < flags.size()) include = flags.get(++i);
             else if (arg.startsWith("-I") || arg.startsWith("/I")) include = arg.substring(2);
             if (include != null) roots.add(request.projectPath().resolve(include).toAbsolutePath().normalize());
         }
-        var env = new java.util.TreeMap<>(System.getenv());
+        var env = new TreeMap<>(System.getenv());
         env.putAll(manifest.getEnv());
-        for (String name : java.util.List.of("CPATH", "C_INCLUDE_PATH", "CPLUS_INCLUDE_PATH", "INCLUDE"))
-            for (String path : env.getOrDefault(name, "").split(java.util.regex.Pattern.quote(java.io.File.pathSeparator)))
+        for (String name : List.of("CPATH", "C_INCLUDE_PATH", "CPLUS_INCLUDE_PATH", "INCLUDE"))
+            for (String path : env.getOrDefault(name, "").split(Pattern.quote(File.pathSeparator)))
                 if (!path.isBlank()) roots.add(request.projectPath().resolve(path).toAbsolutePath().normalize());
-        var nested = new java.util.ArrayList<Path>();
+        var nested = new ArrayList<Path>();
         for (Path root : roots)
             if (roots.stream().anyMatch(other -> !other.equals(root) && root.startsWith(other))) nested.add(root);
         roots.removeAll(nested);
-        var stamps = new java.util.ArrayList<String>();
+        var stamps = new ArrayList<String>();
         for (Path root : roots) stamps.add(namespaces.computeIfAbsent(root, this::namespace));
         return FileHasher.hashCommand(stamps);
     }
@@ -115,39 +150,39 @@ final class BuildRuntime implements AutoCloseable {
     private String namespace(Path root) {
 
         try {
-            var names = new java.util.ArrayList<String>();
-            var sourceNames = new java.util.ArrayList<String>();
+            var names = new ArrayList<String>();
+            var sourceNames = new ArrayList<String>();
             boolean[] mayIncludeSource = {false};
             Path build = request.buildDir().toAbsolutePath().normalize();
             Path cacheRoot = request.options().cacheDirectory().toAbsolutePath().normalize();
-            java.nio.file.Files.walkFileTree(root, java.util.EnumSet.of(java.nio.file.FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE,
-                    new java.nio.file.SimpleFileVisitor<>() {
-                @Override public java.nio.file.FileVisitResult preVisitDirectory(Path path, java.nio.file.attribute.BasicFileAttributes attrs) {
+            Files.walkFileTree(root, EnumSet.of(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE,
+                    new SimpleFileVisitor<>() {
+                @Override public FileVisitResult preVisitDirectory(Path path, BasicFileAttributes attrs) {
                     String name = path.getFileName() == null ? "" : path.getFileName().toString();
                     return !path.equals(root) && (name.equals(".git") || name.equals(".buildgraph-state") || name.equals(".obj"))
                             || path.startsWith(build) && !root.startsWith(build)
                             || path.startsWith(cacheRoot) && !root.startsWith(cacheRoot)
-                            ? java.nio.file.FileVisitResult.SKIP_SUBTREE : java.nio.file.FileVisitResult.CONTINUE;
+                            ? FileVisitResult.SKIP_SUBTREE : FileVisitResult.CONTINUE;
                 }
-                @Override public java.nio.file.FileVisitResult visitFile(Path path, java.nio.file.attribute.BasicFileAttributes attrs) {
+                @Override public FileVisitResult visitFile(Path path, BasicFileAttributes attrs) {
                     if (attrs.isRegularFile()) {
                         (SourceCollector.isSource(path) ? sourceNames : names).add(path.toString());
                         if (!mayIncludeSource[0]) mayIncludeSource[0] = mayIncludeSource(path);
                     }
-                    return java.nio.file.FileVisitResult.CONTINUE;
+                    return FileVisitResult.CONTINUE;
                 }
             });
             if (mayIncludeSource[0]) names.addAll(sourceNames);
             names.sort(String::compareTo);
             return FileHasher.hashCommand(names);
-        } catch (java.nio.file.NoSuchFileException e) { return root + ":missing"; }
-        catch (java.io.IOException e) { return root + ":unreadable:" + System.nanoTime(); }
+        } catch (NoSuchFileException e) { return root + ":missing"; }
+        catch (IOException e) { return root + ":unreadable:" + System.nanoTime(); }
     }
 
-    private static final java.util.regex.Pattern INCLUDE = java.util.regex.Pattern.compile("^\\s*#\\s*(?:include|include_next|import|embed)\\s*(.*)");
+    private static final Pattern INCLUDE = Pattern.compile("^\\s*#\\s*(?:include|include_next|import|embed)\\s*(.*)");
     private static boolean mayIncludeSource(Path path) {
 
-        try (var reader = java.nio.file.Files.newBufferedReader(path)) {
+        try (var reader = Files.newBufferedReader(path)) {
             String line;
             while ((line = reader.readLine()) != null) {
                 if (line.contains("__has_include") || line.contains("__has_embed")) return true;
@@ -159,7 +194,7 @@ final class BuildRuntime implements AutoCloseable {
                 if (end < 0 || SourceCollector.isSource(Path.of(value.substring(1, end)))) return true;
             }
             return false;
-        } catch (java.io.IOException | RuntimeException e) { return true; }
+        } catch (IOException | RuntimeException e) { return true; }
     }
 
     @Override public void close() {

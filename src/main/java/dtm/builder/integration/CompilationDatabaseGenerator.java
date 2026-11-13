@@ -4,8 +4,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import dtm.builder.build.CompileCommandBuilder;
 import dtm.builder.build.CompileSpec;
+import dtm.builder.build.NativeTools;
 import dtm.builder.build.PackagePaths;
 import dtm.builder.build.SourceCollector;
+import dtm.builder.build.TargetPlatform;
 import dtm.builder.build.TargetType;
 import dtm.builder.build.Toolchain;
 import dtm.builder.build.graph.ResolvedTarget;
@@ -63,11 +65,11 @@ public final class CompilationDatabaseGenerator {
                             targetManifest.getIncludes(), dep.includes(), null));
                 }
             }
-            if (targetManifest != null && dtm.builder.build.NativeTools.specified(targetManifest.getPlatform()))
-                targetManifest.setPlatform(dtm.builder.build.TargetPlatform.resolve(targetManifest.getPlatform(), null).triple());
+            if (targetManifest != null && NativeTools.specified(targetManifest.getPlatform()))
+                targetManifest.setPlatform(TargetPlatform.resolve(targetManifest.getPlatform(), null).triple());
             boolean cpp = SourceCollector.isCppSources(List.of(source));
-            Toolchain sourceToolchain = dtm.builder.build.NativeTools.compiler(targetManifest,
-                    dtm.builder.build.TargetPlatform.resolve(targetManifest.getPlatform(), null), toolchain, projectPath);
+            Toolchain sourceToolchain = NativeTools.compiler(targetManifest,
+                    TargetPlatform.resolve(targetManifest.getPlatform(), null), toolchain, projectPath);
             String extension = sourceToolchain.isMsvc() ? ".obj" : ".o";
             String base = sanitize(source.getFileName().toString());
             Path output = buildDir.resolve(".clangd")

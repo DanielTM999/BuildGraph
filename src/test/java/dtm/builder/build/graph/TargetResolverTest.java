@@ -1,5 +1,6 @@
 package dtm.builder.build.graph;
 
+import dtm.builder.build.NativeTargetBuilder;
 import dtm.builder.build.TargetType;
 import dtm.builder.manifest.ManifestParser;
 import dtm.builder.manifest.ManifestProfiles;
@@ -167,7 +168,7 @@ class TargetResolverTest {
                   ] }
                 """), PROJECT, false);
         assertTrue(r.isOk());
-        assertTrue(dtm.builder.build.NativeTargetBuilder.linkDependencies(
+        assertTrue(NativeTargetBuilder.linkDependencies(
                 TargetGraph.of(r.targets()), r.targets().get(1)).isEmpty());
     }
 

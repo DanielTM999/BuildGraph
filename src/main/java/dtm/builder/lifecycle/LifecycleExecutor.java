@@ -1,13 +1,17 @@
 package dtm.builder.lifecycle;
 
 import dtm.builder.build.Artifacts;
+import dtm.builder.build.BuildDirectoryLock;
 import dtm.builder.build.BuildExecutor;
 import dtm.builder.build.BuildRequest;
 import dtm.builder.build.BuildResult;
+import dtm.builder.build.BuildSystem;
+import dtm.builder.build.NativeArtifacts;
 import dtm.builder.build.TestRunner;
 import dtm.builder.build.graph.ResolvedTarget;
 import dtm.builder.build.graph.TargetResolution;
 import dtm.builder.build.graph.TargetResolver;
+import dtm.builder.build.graph.TargetSelection;
 import dtm.builder.manifest.model.LibraryManifest;
 import dtm.builder.manifest.model.ManifestRootModel;
 import dtm.builder.repo.SafeZipExtractor;
@@ -18,6 +22,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -28,11 +33,11 @@ public final class LifecycleExecutor {
 
     public static LifecycleResult run(LifecycleContext ctx, Set<Phase> requested) {
         try {
-            if (!ctx.onlyTargets().isEmpty() && ctx.buildSystem() != dtm.builder.build.BuildSystem.MANIFEST
-                    && ctx.buildSystem() != dtm.builder.build.BuildSystem.DEFAULT)
+            if (!ctx.onlyTargets().isEmpty() && ctx.buildSystem() != BuildSystem.MANIFEST
+                    && ctx.buildSystem() != BuildSystem.DEFAULT)
                 return LifecycleResult.fail("--target requer build direto por manifest; backend " + ctx.buildSystem());
-            if (ctx.buildSystem() == dtm.builder.build.BuildSystem.MANIFEST || ctx.buildSystem() == dtm.builder.build.BuildSystem.DEFAULT)
-                dtm.builder.build.graph.TargetSelection.resolve(ctx.manifest(), ctx.projectPath(),
+            if (ctx.buildSystem() == BuildSystem.MANIFEST || ctx.buildSystem() == BuildSystem.DEFAULT)
+                TargetSelection.resolve(ctx.manifest(), ctx.projectPath(),
                         ctx.toolchain() != null && ctx.toolchain().isMsvc(), ctx.onlyTargets());
         } catch (IllegalArgumentException e) {
             return LifecycleResult.fail(e.getMessage());
@@ -102,17 +107,17 @@ public final class LifecycleExecutor {
     }
 
     private static LifecycleResult clean(LifecycleContext ctx) {
-        try (var lock = dtm.builder.build.BuildDirectoryLock.acquire(ctx.buildDir())) {
+        try (var lock = BuildDirectoryLock.acquire(ctx.buildDir())) {
             if (!ctx.onlyTargets().isEmpty()) {
                 boolean msvc = ctx.toolchain() != null && ctx.toolchain().isMsvc();
-                var graph = dtm.builder.build.graph.TargetSelection.resolve(ctx.manifest(), ctx.projectPath(), msvc, ctx.onlyTargets());
-                java.util.Set<Path> preserved = new java.util.HashSet<>();
+                var graph = TargetSelection.resolve(ctx.manifest(), ctx.projectPath(), msvc, ctx.onlyTargets());
+                Set<Path> preserved = new HashSet<>();
                 for (ResolvedTarget other : TargetResolver.resolve(ctx.manifest(), ctx.projectPath(), msvc).targets())
                     if (graph.target(other.id()) == null)
-                        for (Path output : dtm.builder.build.NativeArtifacts.declaredOutputs(ctx.buildDir(), ctx.manifest(), other, msvc))
+                        for (Path output : NativeArtifacts.declaredOutputs(ctx.buildDir(), ctx.manifest(), other, msvc))
                             preserved.add(output.toAbsolutePath().normalize());
                 for (ResolvedTarget target : graph.targets()) {
-                    dtm.builder.build.NativeArtifacts.clean(ctx.buildDir(), ctx.manifest(), target, msvc, preserved);
+                    NativeArtifacts.clean(ctx.buildDir(), ctx.manifest(), target, msvc, preserved);
                     ctx.info().accept("Clean: " + target.id());
                 }
                 return LifecycleResult.ok("Clean da cadeia selecionada concluido");
@@ -136,7 +141,7 @@ public final class LifecycleExecutor {
 
         TargetResolution resolution = TargetResolver.resolve(manifest, ctx.projectPath(), msvc);
         if (!resolution.multiTarget()) {
-            Path artifact = dtm.builder.build.NativeArtifacts.artifact(ctx.buildDir(), manifest,
+            Path artifact = NativeArtifacts.artifact(ctx.buildDir(), manifest,
                     resolution.targets().getFirst(), msvc);
             if (!Files.isRegularFile(artifact)) return LifecycleResult.fail("Artefato ausente: " + artifact);
             return publish(ctx, projectId,
@@ -145,13 +150,13 @@ public final class LifecycleExecutor {
         }
 
         List<String> published = new ArrayList<>();
-        var selected = dtm.builder.build.graph.TargetSelection.resolve(manifest, ctx.projectPath(), msvc, ctx.onlyTargets());
+        var selected = TargetSelection.resolve(manifest, ctx.projectPath(), msvc, ctx.onlyTargets());
         for (ResolvedTarget target : selected.targets()) {
             if (!target.type().isLibrary()) {
                 continue;
             }
             String packageId = projectId + "-" + target.id();
-            Path artifact = dtm.builder.build.NativeArtifacts.artifact(ctx.buildDir(), manifest, target, msvc);
+            Path artifact = NativeArtifacts.artifact(ctx.buildDir(), manifest, target, msvc);
             if (!Files.isRegularFile(artifact)) return LifecycleResult.fail("Artefato ausente: " + artifact);
             LifecycleResult one = publish(ctx, packageId, target.name(), version,
                     manifest.getDescription(), target.includes(), artifact);

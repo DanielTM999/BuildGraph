@@ -3,6 +3,7 @@ package dtm.builder.lifecycle;
 import dtm.builder.manifest.model.ManifestTaskModel;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -15,7 +16,7 @@ class TaskExecutorOrderTest {
         ManifestTaskModel t = new ManifestTaskModel();
         t.setId(id);
         t.setOrder(order);
-        t.setDependsOn(new java.util.ArrayList<>(List.of(dependsOn)));
+        t.setDependsOn(new ArrayList<>(List.of(dependsOn)));
         t.setCommand("echo");
         return t;
     }

@@ -10,7 +10,9 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.List;
 
 public final class InteractiveSession {
 
@@ -98,7 +100,7 @@ public final class InteractiveSession {
 
     private boolean runPhaseLine(String command, String lower) {
         EnumSet<Phase> phases = EnumSet.noneOf(Phase.class);
-        java.util.List<String> targets = new java.util.ArrayList<>();
+        List<String> targets = new ArrayList<>();
         String[] tokens = command.split("\\s+");
         boolean targetOverride = false;
         for (int i = 0; i < tokens.length; i++) {

@@ -1,6 +1,7 @@
 package dtm.builder.build.incremental;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dtm.builder.build.NativeArtifacts;
 
 import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;
@@ -52,7 +53,7 @@ public final class BuildStateStore {
     }
 
     public static Path stateFile(Path buildDir, String targetId) {
-        dtm.builder.build.NativeArtifacts.requireId(targetId);
+        NativeArtifacts.requireId(targetId);
         return stateDir(buildDir).resolve(targetId + ".json");
     }
 }

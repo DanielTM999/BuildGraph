@@ -127,6 +127,9 @@ public final class PlaceholderResolver {
     }
 
     private String profileValue(String rest) {
+        if ("name".equals(rest)) {
+            rest = "current.name";
+        }
         int dot = rest.indexOf('.');
         if (dot < 0) {
             return null;
@@ -138,17 +141,25 @@ public final class PlaceholderResolver {
             return null;
         }
 
-        ManifestProfileModel profile;
-        if ("current".equals(selector)) {
-            String active = manifest.getActiveProfile();
-            profile = active == null ? null : findProfile(manifest, active);
-        } else {
-            profile = findProfile(manifest, selector);
-        }
+        String name = "current".equals(selector) ? manifest.getActiveProfile() : selector;
+        ManifestProfileModel profile = findProfile(manifest, name);
         if (profile == null) {
             return null;
         }
+        if ("name".equals(prop) && profile.getProperties().get(prop) == null) {
+            return declaredName(manifest, name);
+        }
         return profileProp(profile, prop);
+    }
+
+    private String declaredName(ManifestRootModel manifest, String name) {
+        String norm = name.trim().toLowerCase();
+        for (String key : manifest.getProfiles().keySet()) {
+            if (key != null && key.trim().toLowerCase().equals(norm)) {
+                return key.trim();
+            }
+        }
+        return name.trim();
     }
 
     private ManifestProfileModel findProfile(ManifestRootModel manifest, String name) {

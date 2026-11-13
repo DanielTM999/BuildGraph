@@ -1,7 +1,10 @@
 package dtm.builder.build;
 
+import dtm.builder.build.cache.SharedObjectCache;
+
 import java.io.IOException;
 import java.nio.file.*;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -31,10 +34,10 @@ final class MemoryHistory {
             temporary = Files.createTempFile(file.toAbsolutePath().getParent(), ".memory-", ".tmp");
             Properties values = new Properties();
 
-            peaks.entrySet().stream().sorted(java.util.Map.Entry.<String,Long>comparingByValue().reversed()).limit(20_000)
+            peaks.entrySet().stream().sorted(Map.Entry.<String,Long>comparingByValue().reversed()).limit(20_000)
                     .forEach(entry -> values.setProperty(entry.getKey(), entry.getValue().toString()));
             try (var output = Files.newOutputStream(temporary)) { values.store(output, "BuildGraph observed peak RSS bytes"); }
-            dtm.builder.build.cache.SharedObjectCache.atomicMove(temporary, file);
+            SharedObjectCache.atomicMove(temporary, file);
         } catch (IOException | RuntimeException ignored) { }
         finally { if (temporary != null) try { Files.deleteIfExists(temporary); } catch (IOException ignored) { } }
     }

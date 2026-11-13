@@ -14,6 +14,7 @@ import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
@@ -46,7 +47,7 @@ public final class DependencyLockStore {
     public static boolean write(Path projectPath, DependencyLock lock) throws IOException {
         Path file = path(projectPath);
         byte[] content = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(lock);
-        if (Files.isRegularFile(file) && java.util.Arrays.equals(Files.readAllBytes(file), content)) {
+        if (Files.isRegularFile(file) && Arrays.equals(Files.readAllBytes(file), content)) {
             return false;
         }
         Path temporary = file.resolveSibling(file.getFileName() + ".tmp");

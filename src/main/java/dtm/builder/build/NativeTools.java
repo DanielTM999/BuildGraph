@@ -1,8 +1,14 @@
 package dtm.builder.build;
 
 import dtm.builder.manifest.model.ManifestRootModel;
+
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.regex.Pattern;
 
 public final class NativeTools {
     private NativeTools() { }
@@ -96,15 +102,15 @@ public final class NativeTools {
     public static void validateAssembler(Tool tool, TargetPlatform requested, BuildRequest req,
                                          ManifestRootModel manifest) {
         if (!tool.kind().equals("gas") || req.executor() != ProcessExecutor.REAL) return;
-        java.util.List<String> output = new java.util.ArrayList<>();
-        java.util.Map<String, String> probeEnv = new java.util.LinkedHashMap<>(manifest.getEnv());
+        List<String> output = new ArrayList<>();
+        Map<String, String> probeEnv = new LinkedHashMap<>(manifest.getEnv());
         probeEnv.put("LC_ALL", "C");
-        int exit = req.executor().run(java.util.List.of(tool.executable().toString(), "--version"),
+        int exit = req.executor().run(List.of(tool.executable().toString(), "--version"),
                 req.projectPath(), probeEnv, output::add);
         if (exit != 0) throw new IllegalArgumentException("Assembler indisponivel: " + tool.executable());
         String text = String.join("\n", output);
-        var matcher = java.util.regex.Pattern.compile("(?:target of|target:)\\s+[`'\"]?([A-Za-z0-9_.-]+)",
-                java.util.regex.Pattern.CASE_INSENSITIVE).matcher(text);
+        var matcher = Pattern.compile("(?:target of|target:)\\s+[`'\"]?([A-Za-z0-9_.-]+)",
+                Pattern.CASE_INSENSITIVE).matcher(text);
         if (!matcher.find()) throw new IllegalArgumentException("GNU assembler nao informou seu destino: " + tool.executable());
         String triple = matcher.group(1);
 

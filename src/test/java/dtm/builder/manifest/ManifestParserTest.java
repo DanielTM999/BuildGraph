@@ -4,6 +4,8 @@ import dtm.builder.manifest.model.ManifestParseResult;
 import dtm.builder.manifest.model.ManifestRootModel;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -23,8 +25,8 @@ class ManifestParserTest {
                 </Manifest>
                 """, true).getManifest();
 
-        assertEquals(java.util.List.of("repo/a", "D:/repo-b"), json.getRepositories());
-        assertEquals(java.util.List.of("repo/a", "D:/repo-b"), xml.getRepositories());
+        assertEquals(List.of("repo/a", "D:/repo-b"), json.getRepositories());
+        assertEquals(List.of("repo/a", "D:/repo-b"), xml.getRepositories());
     }
 
     @Test
@@ -45,12 +47,12 @@ class ManifestParserTest {
         assertTrue(json.isSkipTests());
         assertTrue(xml.isSkipTests());
         assertFalse(absent.isSkipTests());
-        assertEquals(java.util.List.of("jit/alloc.cpp", "gc"), json.getExcludeTests());
-        assertEquals(java.util.List.of("jit/alloc.cpp", "gc"), xml.getExcludeTests());
+        assertEquals(List.of("jit/alloc.cpp", "gc"), json.getExcludeTests());
+        assertEquals(List.of("jit/alloc.cpp", "gc"), xml.getExcludeTests());
         assertTrue(absent.getExcludeTests().isEmpty());
         ManifestRootModel effective = ManifestProfiles.effective(json);
         assertTrue(effective.isSkipTests());
-        assertEquals(java.util.List.of("jit/alloc.cpp", "gc"), effective.getExcludeTests());
+        assertEquals(List.of("jit/alloc.cpp", "gc"), effective.getExcludeTests());
     }
 
     @Test
@@ -87,7 +89,7 @@ class ManifestParserTest {
         ManifestRootModel m = result.getManifest();
         assertEquals("MyProjectTeste", m.getId());
         assertEquals("1.0.0", m.getVersion());
-        assertEquals(java.util.List.of("src"), m.getSources());
+        assertEquals(List.of("src"), m.getSources());
         assertEquals("specs", m.getTestFolder());
         assertEquals("TestMain.cpp", m.getTestMain());
         assertEquals(1, m.getPackages().size());
@@ -144,7 +146,7 @@ class ManifestParserTest {
         ManifestRootModel m = result.getManifest();
         assertEquals("MyProjectTeste", m.getId());
         assertEquals("2.0.0", m.getVersion());
-        assertEquals(java.util.List.of("src", "lib"), m.getSources());
+        assertEquals(List.of("src", "lib"), m.getSources());
         assertEquals(1, m.getPackages().size());
         assertEquals("fmt", m.getPackages().get(0).getId());
         assertEquals(2, m.getTasks().size());

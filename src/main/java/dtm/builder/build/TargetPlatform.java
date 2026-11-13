@@ -1,6 +1,7 @@
 package dtm.builder.build;
 
 import java.util.Locale;
+import java.util.Set;
 import java.util.function.Consumer;
 
 public record TargetPlatform(String arch, String os, String triple) {
@@ -18,7 +19,7 @@ public record TargetPlatform(String arch, String os, String triple) {
         if (raw == null || raw.isBlank() || raw.equalsIgnoreCase("native")) return host();
         String value = raw.trim().toLowerCase(Locale.ROOT);
         String[] parts = value.split("-");
-        if (parts.length == 2 && java.util.Set.of("windows", "linux", "macos", "darwin", "freebsd").contains(parts[0])) {
+        if (parts.length == 2 && Set.of("windows", "linux", "macos", "darwin", "freebsd").contains(parts[0])) {
             String os = parts[0].equals("macos") ? "darwin" : parts[0];
             String arch = architecture(parts[1]);
             if (!knownArchitecture(arch)) return fallback(raw, warning);

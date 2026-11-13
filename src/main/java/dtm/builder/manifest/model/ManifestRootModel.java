@@ -2,6 +2,8 @@ package dtm.builder.manifest.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
@@ -27,9 +29,9 @@ public class ManifestRootModel extends NativeOptions {
     private String cxxStandard;
     private String toolchainVersion;
     private String platform;
-    @com.fasterxml.jackson.annotation.JsonProperty("cCompiler")
+    @JsonProperty("cCompiler")
     private String cCompiler;
-    @com.fasterxml.jackson.annotation.JsonProperty("cxxCompiler")
+    @JsonProperty("cxxCompiler")
     private String cxxCompiler;
     private String sysroot;
     private boolean library;
@@ -38,10 +40,10 @@ public class ManifestRootModel extends NativeOptions {
     private String activeProfile;
     private String testFolder;
     private String testMain;
-    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_DEFAULT)
+    @JsonInclude(JsonInclude.Include.NON_DEFAULT)
     private boolean skipTests;
 
-    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_EMPTY)
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
     @JsonSetter(nulls = Nulls.SKIP)
     @JacksonXmlElementWrapper(localName = "excludeTests")
     @JacksonXmlProperty(localName = "excludeTest")
@@ -181,7 +183,7 @@ public class ManifestRootModel extends NativeOptions {
         this.platform = platform;
     }
 
-    @com.fasterxml.jackson.annotation.JsonProperty("cCompiler")
+    @JsonProperty("cCompiler")
     public String getCCompiler() {
         return cCompiler;
     }
@@ -190,7 +192,7 @@ public class ManifestRootModel extends NativeOptions {
         this.cCompiler = cCompiler;
     }
 
-    @com.fasterxml.jackson.annotation.JsonProperty("cxxCompiler")
+    @JsonProperty("cxxCompiler")
     public String getCxxCompiler() {
         return cxxCompiler;
     }

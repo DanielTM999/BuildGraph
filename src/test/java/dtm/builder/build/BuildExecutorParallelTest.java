@@ -1,9 +1,10 @@
 package dtm.builder.build;
 
-import dtm.builder.manifest.model.*;
 import dtm.builder.build.incremental.*;
+import dtm.builder.manifest.model.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.*;
@@ -11,6 +12,9 @@ import java.nio.file.attribute.FileTime;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class BuildExecutorParallelTest {
@@ -27,7 +31,7 @@ class BuildExecutorParallelTest {
                 project.resolve("packages"), project.resolve("build"), "Debug", ignored -> {}, 4, List.of(), true,
                 this::execute, new BuildOptions(64L << 20, 1L << 20, project.resolve("cache"), 0, false, true));
     }
-    int execute(List<String> command, Path cwd, Map<String,String> env, java.util.function.Consumer<String> out) {
+    int execute(List<String> command, Path cwd, Map<String,String> env, Consumer<String> out) {
         Path object = Path.of(command.get(command.indexOf("-o") + 1));
         try {
             Files.createDirectories(object.getParent());
@@ -95,7 +99,7 @@ class BuildExecutorParallelTest {
         for (int i = 0; i < 20; i++) Files.writeString(project.resolve("src/u" + i + ".cpp"), "int value;");
         blocked = new CountDownLatch(1);
         var req = request(manifest());
-        var result = new java.util.concurrent.atomic.AtomicReference<BuildResult>();
+        var result = new AtomicReference<BuildResult>();
         Thread build = Thread.ofPlatform().start(() -> result.set(BuildExecutor.build(req)));
         try {
             assertTrue(started.await(10, TimeUnit.SECONDS)); build.interrupt(); build.join(10000);

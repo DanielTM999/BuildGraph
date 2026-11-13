@@ -4,9 +4,13 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 public final class ProcessRunner {
@@ -49,7 +53,7 @@ public final class ProcessRunner {
             }
         });
         try {
-            while (!process.waitFor(100, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+            while (!process.waitFor(100, TimeUnit.MILLISECONDS)) {
                 long resident = residentBytes(process.toHandle());
                 PEAK.set(Math.max(PEAK.get(), resident));
             }
@@ -70,7 +74,7 @@ public final class ProcessRunner {
         }
     }
 
-    private static final java.util.Set<Process> ACTIVE = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private static final Set<Process> ACTIVE = ConcurrentHashMap.newKeySet();
     private static final ThreadLocal<Long> PEAK = ThreadLocal.withInitial(() -> 0L);
     static {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> ACTIVE.forEach(ProcessRunner::terminate), "buildgraph-process-cleanup"));
@@ -84,7 +88,7 @@ public final class ProcessRunner {
         process.destroyForcibly();
         try { process.getInputStream().close(); } catch (IOException ignored) { }
         boolean interrupted = Thread.interrupted();
-        try { process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS); }
+        try { process.waitFor(5, TimeUnit.SECONDS); }
         catch (InterruptedException e) { interrupted = true; }
         if (interrupted) Thread.currentThread().interrupt();
     }
@@ -97,7 +101,7 @@ public final class ProcessRunner {
     }
     private static long rss(long pid) {
         try {
-            for (String line : java.nio.file.Files.readAllLines(Path.of("/proc", Long.toString(pid), "status")))
+            for (String line : Files.readAllLines(Path.of("/proc", Long.toString(pid), "status")))
                 if (line.startsWith("VmRSS:")) return Long.parseLong(line.replaceAll("[^0-9]", "")) * 1024;
         } catch (IOException | NumberFormatException ignored) { }
         return 0;
