@@ -1,6 +1,7 @@
 package dtm.builder.build;
 
 import dtm.builder.build.cache.PreprocessedObjectCache;
+import dtm.builder.build.resources.ExecutableResourceBuilder;
 import dtm.builder.build.graph.ResolvedTarget;
 import dtm.builder.build.graph.TargetGraph;
 import dtm.builder.build.graph.TargetResolver;
@@ -102,7 +103,10 @@ public final class NativeTargetBuilder {
         }
         boolean finalLink = target.type() != TargetType.STATIC && target.type() != TargetType.OBJECT && !flat;
         boolean driverLink = finalLink && (mode.equals("driver") || mode.equals("auto") && c);
-        boolean needsCompiler = sources.stream().anyMatch(s -> !SourceCollector.isAssembly(s) || SourceCollector.needsPreprocessor(s)) || driverLink;
+        boolean hasResources = target.type() == TargetType.EXECUTABLE
+                && (NativeTools.specified(m.getIcon()) || m.getMetadata().values().stream().anyMatch(v -> v != null));
+        boolean needsCompiler = sources.stream().anyMatch(s -> !SourceCollector.isAssembly(s) || SourceCollector.needsPreprocessor(s))
+                || driverLink || hasResources && platform.os().equals("linux");
         Toolchain compiler = needsCompiler ? NativeTools.compiler(m, platform, req.toolchain(), req.projectPath()) : null;
         boolean msvc = compiler != null && compiler.isMsvc();
         Map<Path, NativeTools.Tool> assemblers = new LinkedHashMap<>();
@@ -241,6 +245,13 @@ public final class NativeTargetBuilder {
                     inputs.add(dep.type() == TargetType.SHARED && nativeMsvc ? importLibrary(depArtifact) : depArtifact);
                 tracked.add(depArtifact);
             }
+            ExecutableResourceBuilder.Result executableResources = target.type() == TargetType.EXECUTABLE
+                    ? new ExecutableResourceBuilder().build(req, m, platform, compiler, nativeMsvc,
+                            driverLink, objDir.resolve(platform.triple().replaceAll("[^A-Za-z0-9_.-]", "_")
+                                    + "-" + req.buildMode().replaceAll("[^A-Za-z0-9_.-]", "_")), out)
+                    : ExecutableResourceBuilder.Result.empty();
+            inputs.addAll(executableResources.inputs());
+            tracked.addAll(executableResources.inputs());
             tracked.addAll(packages.linkInputFiles());
             for (String file : m.getLinkDependencies()) {
                 Path path = req.projectPath().resolve(file).normalize();
@@ -256,9 +267,11 @@ public final class NativeTargetBuilder {
                             driverLink ? msvc ? "msvc" : "gnu" : linker.kind(), driverLink, cpp, platform, m,
                             req.projectPath(), target.type() == TargetType.SHARED, inputs, linkOutput,
                             packages.libraryDirs(), packages.linkLibraries());
+            command.addAll(executableResources.linkFlags());
             List<String> conversion = objcopy == null ? List.of()
                     : List.of(objcopy.toString(), "-O", "binary", linkOutput.toString(), artifact.toString());
             List<String> signature = new ArrayList<>(command);
+            signature.add("resource-fingerprint=" + executableResources.fingerprint());
             signature.addAll(conversion);
             long linkChecked = runtime.metrics.start();
             boolean needsLink = incremental.needsLink(state, signature, artifact, tracked);

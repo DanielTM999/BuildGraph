@@ -1,11 +1,25 @@
 package dtm.builder.manifest.model;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import dtm.builder.manifest.ManifestMerge;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public class NativeOptions {
+    private String icon;
+    private boolean iconDeclared;
+    private Map<String, String> metadata = new LinkedHashMap<>();
+    public String getIcon() { return icon; }
+    public void setIcon(String value) { icon = value; iconDeclared = true; }
+    @JsonIgnore
+    public boolean isIconDeclared() { return iconDeclared; }
+    public Map<String, String> getMetadata() { return metadata; }
+    public void setMetadata(Map<String, String> value) {
+        metadata = value == null ? new LinkedHashMap<>() : new LinkedHashMap<>(value);
+    }
     private String asmCompiler;
     public String getAsmCompiler() { return asmCompiler; }
     public void setAsmCompiler(String value) { asmCompiler = value; }
@@ -46,6 +60,11 @@ public class NativeOptions {
     public static void merge(NativeOptions base, NativeOptions override, NativeOptions out) {
         if (base == null) base = new NativeOptions();
         if (override == null) override = new NativeOptions();
+        if (override.isIconDeclared()) out.setIcon(override.getIcon());
+        else if (base.isIconDeclared()) out.setIcon(base.getIcon());
+        Map<String, String> mergedMetadata = new LinkedHashMap<>(base.getMetadata());
+        mergedMetadata.putAll(override.getMetadata());
+        out.setMetadata(mergedMetadata);
         out.setAsmCompiler(ManifestMerge.pick(base.getAsmCompiler(), override.getAsmCompiler()));
         out.setAsmKind(ManifestMerge.pick(base.getAsmKind(), override.getAsmKind()));
         out.setLinker(ManifestMerge.pick(base.getLinker(), override.getLinker()));

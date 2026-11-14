@@ -28,6 +28,15 @@ Todas as mudanças relevantes serão documentadas neste arquivo. O formato segue
 - `refresh` passa a atualizar o lock implicitamente.
 - Build incremental relinka quando bibliotecas precompiladas de packages mudam.
 
+## [1.1.7] - 2026-11-14
+
+### Adicionado
+
+- `icon` e `metadata` no manifest, profiles e targets, com herança, sobrescrita e remoção explícita.
+- Conversão determinística de ícones para ICO e ICNS, recursos PE/COFF com `VERSIONINFO`,
+  seções ELF para PNG e JSON, e seções Mach-O para ICNS e `Info.plist`.
+- Cache independente dos recursos de executáveis e testes de integração reais em Windows e Linux.
+
 ## [1.1.6] - 2026-11-13
 
 ### Adicionado

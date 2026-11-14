@@ -66,6 +66,18 @@ class NativeBuildTest {
         m.setPlatform("x86_64-linux-gnu");
         return m;
     }
+    @Test void inheritedExecutableResourcesAreIgnoredByLibraries() throws Exception {
+        for (String kind : List.of("static", "shared")) {
+            ManifestRootModel m = manifest();
+            m.setIcon("does-not-exist.png");
+            m.setMetadata(Map.of("productName", "Ignored"));
+            m.setTargets(List.of(target("resource-" + kind, kind, "resource-" + kind + ".c")));
+            FakeTools tools = new FakeTools();
+            BuildResult result = BuildExecutor.build(request(m, tools));
+            assertTrue(result.success(), result.message());
+            assertTrue(tools.commands.stream().noneMatch(c -> c.stream().anyMatch(s -> s.contains("resources"))));
+        }
+    }
     ManifestTargetModel target(String id, String type, String... sources) throws Exception {
         ManifestTargetModel t = new ManifestTargetModel(); t.setId(id); t.setType(type); t.setSources(List.of(sources));
         for (String source : sources) Files.writeString(project.resolve(source), "source");

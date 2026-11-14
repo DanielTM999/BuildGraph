@@ -453,6 +453,62 @@ Exemplo JSON:
 }
 ```
 
+### Ícone e metadados de executáveis
+
+`icon` e `metadata` podem aparecer na raiz, em um profile, em um target e em um target
+de um profile. A precedência é raiz → profile → target → override do target no profile.
+O ícone mais específico substitui o anterior; `"icon": null` o desabilita.
+As chaves de `metadata` são mescladas separadamente; uma chave com valor `null`
+remove a herdada. Os valores explícitos têm prioridade sobre os padrões derivados de
+`name`, `description` e `version`. A raiz pode definir recursos para vários targets,
+mas bibliotecas `static` e `shared` não os recebem.
+
+```json
+{
+  "id": "vertex-vm",
+  "name": "VertexVM",
+  "version": "1.0.0",
+  "sources": ["src/common"],
+  "icon": "assets/icon.png",
+  "metadata": {
+    "productName": "Vertex Virtual Machine",
+    "companyName": "Vertex",
+    "description": "Vertex Runtime",
+    "author": "Daniel Melo"
+  },
+  "targets": [
+    {"id": "vertex", "type": "executable", "sources": ["src/main.c"]},
+    {"id": "vertex-debug", "type": "executable", "sources": ["src/debug.c"],
+     "icon": null, "metadata": {"description": "Vertex Debug Runtime"}}
+  ]
+}
+```
+
+Chaves conhecidas: `productName`, `companyName`, `description`, `fileVersion`,
+`productVersion`, `copyright`, `trademark`, `internalName`, `originalFilename`,
+`identifier`, `author`, `license`, `website` e `comments`. Chaves adicionais são
+preservadas como strings nos formatos que permitem. No Windows elas entram no bloco
+`StringFileInfo` do `VERSIONINFO`; no Linux, no JSON da seção ELF; no macOS, no plist
+sob a chave `BuildGraph.<nome>`.
+
+| Destino | Incorporação | Ferramenta adicional quando há recursos |
+| --- | --- | --- |
+| Windows PE/COFF | ICO e VERSIONINFO no próprio `.exe` | `windres`/`llvm-windres` com linker GNU; `rc.exe`/`llvm-rc` com linker MSVC |
+| Linux ELF | `.buildgraph.icon` (PNG) e `.buildgraph.metadata` (JSON UTF-8) como seções alocadas | Compilador C com suporte a assembler GNU |
+| macOS Mach-O | `Info.plist` em `__TEXT,__info_plist` e ICNS em `__DATA,__buildgraph_icon` | Linker Darwin com `-sectcreate` |
+
+As seções ELF são específicas do BuildGraph; gerenciadores de arquivos Linux não as
+interpretam como ícone de aplicativo. Um executável Mach-O simples também não é um
+bundle `.app`: Finder não usa o ICNS incorporado como ícone sem um bundle com
+`Contents/Resources/icon.icns`. O BuildGraph não cria `.desktop` nem `.app`
+automaticamente. A criação de `.app` ainda não está disponível.
+
+Conversões usam Java `ImageIO`, preservam proporção e transparência e deixam a
+imagem de origem intacta. ICO aceita PNG ou DIB 24/32 bits; ICNS precisa conter uma
+entrada PNG. O BuildGraph gera recursos somente quando `icon` ou alguma chave de `metadata`
+está efetivamente configurada. O cache de recursos usa o conteúdo da imagem e o
+metadata efetivo; alterar só recursos relinka sem recompilar fontes C/C++.
+
 ### Referência dos campos raiz
 
 Campos desconhecidos são ignorados. Listas e mapas nulos são tratados como vazios.
@@ -463,6 +519,8 @@ Campos desconhecidos são ignorados. Listas e mapas nulos são tratados como vaz
 | `name` | string | Nome do projeto e nome-base do artefato. Se ausente, usa `id` ou a pasta do projeto. |
 | `version` | string | Versão publicada por `install`. |
 | `description` | string | Descrição propagada ao manifest da biblioteca instalada. |
+| `icon` | string ou null | Imagem do executável, relativa ao projeto. PNG, JPEG, BMP, ICO (PNG ou DIB 24/32 bits) e ICNS com entrada PNG. `null` em um target remove o ícone herdado. |
+| `metadata` | object | Metadados do executável; chaves são mescladas individualmente e `null` remove uma chave herdada. |
 | `library` | boolean | Gera biblioteca compartilhada em vez de executável no build direto. |
 | `cCompiler` | string | Nome ou caminho do executável do compilador C. |
 | `cxxCompiler` | string | Nome ou caminho do executável do compilador C++. |
@@ -545,7 +603,7 @@ Regras completas de composição:
 Campos aceitos dentro de um profile incluem `buildType`, `platform`, `toolchainVersion`,
 `compilerVersion`, `cStandard`, `cxxStandard`, `sysroot`, `cCompiler`, `cxxCompiler`, `outputDir`,
 `packagesBase`, `library`, as listas de compilação, `repositories`, `packages`, `env` e
-`properties`.
+`properties`, `icon` e `metadata`.
 
 ### Targets
 
