@@ -99,7 +99,7 @@ public final class CommandDispatcher {
             phases = EnumSet.of(Phase.BUILD);
         }
 
-        boolean ok = context.runPhases(phases);
+        boolean ok = args.hasRelease() ? context.runReleasePhases(phases) : context.runPhases(phases);
         return ok ? 0 : 1;
     }
 
@@ -205,7 +205,7 @@ public final class CommandDispatcher {
         printer.println(Severity.NONE,
                 "                [--compile-commands] [-t <target>] [-j <jobs>]");
         printer.println(Severity.NONE,
-                "                [--no-incremental] [--skip-tests] [--skip-test <file>]");
+                "                [--no-incremental] [--release] [--skip-tests] [--skip-test <file>]");
         printer.println(Severity.NONE, "");
         printer.println(Severity.NONE, "  projectPath   diretorio do projeto (default: diretorio atual)");
         printer.println(Severity.NONE, "  clean/build/package/install/test  fases do lifecycle (default: build; package = build)");
@@ -238,6 +238,8 @@ public final class CommandDispatcher {
                 "  build         incremental por padrao em builds diretos");
         printer.println(Severity.NONE,
                 "  --no-incremental  ignora o estado nesta execucao/sessao");
+        printer.println(Severity.NONE,
+                "  --release     build direto do zero, sem cache; testa e deixa so artefatos publicaveis");
         printer.println(Severity.NONE, "  outputDir default  <projeto>/build");
         printer.println(Severity.NONE, "  precedencia        manifest/profile -> CLI -> defaults");
         printer.println(Severity.NONE, "  install       publica o projeto (id:version) no repo global");

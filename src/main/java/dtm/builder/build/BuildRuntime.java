@@ -84,7 +84,7 @@ final class BuildRuntime implements AutoCloseable {
 
     String environment(ManifestRootModel manifest, Toolchain compiler) {
         String full = environment(manifest.getEnv(), compiler);
-        if (compiler == null || compiler.isMsvc() || compiler.kind() == ToolchainKind.CUSTOM
+        if (!request.options().sharedCache() || compiler == null || compiler.isMsvc() || compiler.kind() == ToolchainKind.CUSTOM
                 || request.executor() != ProcessExecutor.REAL) return full;
         List<String> drivers = Stream.of(compiler.cc(), compiler.cxx())
                 .filter(Objects::nonNull).distinct().map(Path::toString).toList();
@@ -105,7 +105,7 @@ final class BuildRuntime implements AutoCloseable {
         if (compiler == null) return "none";
         var fingerprints = new ArrayList<String>();
         for (Path driver : Stream.of(compiler.cc(), compiler.cxx()).filter(Objects::nonNull).distinct().toList()) {
-            String value = request.executor() == ProcessExecutor.REAL && !compiler.isMsvc()
+            String value = request.options().sharedCache() && request.executor() == ProcessExecutor.REAL && !compiler.isMsvc()
                     ? cache.fingerprint(request, manifest, driver.toString(), environment(manifest.getEnv(), compiler)) : null;
             fingerprints.add(value == null ? toolFingerprint(driver) : value);
         }
@@ -200,7 +200,7 @@ final class BuildRuntime implements AutoCloseable {
     @Override public void close() {
         scheduler.close();
         directoryLock.close();
-        cache.prune();
+        if (request.options().sharedCache()) cache.prune();
         history.save();
         metrics.report(output, scheduler.peak(), resources.budget(), resources.workers());
     }

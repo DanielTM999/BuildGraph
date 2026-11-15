@@ -28,6 +28,13 @@ Todas as mudanças relevantes serão documentadas neste arquivo. O formato segue
 - `refresh` passa a atualizar o lock implicitamente.
 - Build incremental relinka quando bibliotecas precompiladas de packages mudam.
 
+## [1.1.8] - 2026-11-14
+
+### Adicionado
+
+- `--release` reconstrói builds diretos sem cache, executa os testes e limpa a saída para publicação,
+  preservando apenas os artefatos finais e as bibliotecas de importação necessárias.
+
 ## [1.1.7] - 2026-11-14
 
 ### Adicionado

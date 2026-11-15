@@ -60,7 +60,7 @@ buildgraph [projectPath] [clean] [build] [test] [install] [refresh] [lock]
            [--test-main arquivo]
            [-t target] [-j auto|jobs]
            [--repo caminho] [--packages caminho] [--compile-commands]
-           [--no-incremental] [--skip-tests] [--skip-test arquivo]
+           [--no-incremental] [--release] [--skip-tests] [--skip-test arquivo]
            [--memory-limit 8G] [--memory-per-job 768M] [--memory-reserve 512M]
            [--cache-dir caminho] [--cache-size 5G] [--no-cache] [--profile-build]
 ```
@@ -95,6 +95,7 @@ BuildGraph executa `build`.
 | `--memory-reserve` | Reserva para o SO; default: 1/16 da RAM física, entre 512 MiB e 2 GiB. |
 | `--cache-dir`, `--cache-size` | Diretório dedicado e quota do cache de objetos (default: 5 GiB). |
 | `--no-cache` | Desabilita o cache compartilhado e preserva o incremental local. |
+| `--release` | Refaz o build direto do zero, sem cache local ou compartilhado; executa testes e deixa apenas os artefatos para publicação. |
 | `--profile-build` | Emite métricas de performance no formato de saída selecionado. |
 | `--no-incremental` | Ignora o estado incremental, recompila todas as fontes e regrava o cache. |
 
@@ -114,6 +115,8 @@ BuildGraph . refresh --repo D:/buildgraph-repository
 BuildGraph . lock
 
 BuildGraph . build --no-incremental
+
+BuildGraph . --release
 ```
 
 As fases solicitadas são sempre ordenadas como `clean → build → test → install`, mesmo que tenham
@@ -124,6 +127,31 @@ Durante o build, o progresso é exibido como `[atual/total]`, começando em `[0/
 diretos, cada fonte compilada e a etapa final de link/archive contam como uma unidade e mostram
 sua duração. O mesmo formato é usado nos modos normal e interativo, inclusive com targets
 executados em paralelo.
+
+### Build para publicação
+
+```shell
+BuildGraph . --release
+BuildGraph . build --release --target app
+BuildGraph . install --release
+```
+
+`--release` executa `clean → build → test`, além de `install` quando solicitado. O modo usa
+`Release` por padrão e respeita o `buildType` do profile ativo. Recompila todas as fontes sem
+ler nem gravar o cache compartilhado de objetos. Ao terminar, remove objetos intermediários,
+arquivos de dependências, estado incremental, inventários, executáveis dos testes, relatórios e
+temporários. Permanecem apenas os artefatos declarados dos targets selecionados e suas
+bibliotecas; bibliotecas de importação `.lib` de DLLs também são preservadas. Targets `object`
+usados apenas como dependências são removidos; objetos pedidos explicitamente são preservados.
+
+A limpeza substitui **todo** o `outputDir`, inclusive ao usar `--target`; saídas antigas de outros
+targets são removidas. Falhas de compilação, teste ou tarefas do lifecycle mantêm o código de
+erro e limpam a saída, sem deixar uma release parcial. Os testes terminam antes de `install`.
+`skipTests` do manifest é desativado nesse modo; exclusões individuais de testes continuam
+válidas. `--skip-tests`, `--interactive` e `--compile-commands` são incompatíveis com `--release`.
+
+Disponível para builds diretos por manifest ou descoberta de fontes C/C++/ASM. CMake, Meson e
+Make são recusados sem limpar a saída, pois suas regras de entrega são controladas pelo backend.
 
 ### Compilação incremental
 

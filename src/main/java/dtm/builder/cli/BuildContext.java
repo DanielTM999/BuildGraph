@@ -17,6 +17,7 @@ import dtm.builder.lifecycle.LifecycleContext;
 import dtm.builder.lifecycle.LifecycleExecutor;
 import dtm.builder.lifecycle.LifecycleResult;
 import dtm.builder.lifecycle.Phase;
+import dtm.builder.lifecycle.ReleaseExecutor;
 import dtm.builder.manifest.ManifestParser;
 import dtm.builder.manifest.ManifestProfiles;
 import dtm.builder.manifest.ManifestResolver;
@@ -231,6 +232,14 @@ public final class BuildContext {
     }
 
     public boolean runPhases(Set<Phase> phases, List<String> selectedTargets) {
+        return runPhases(phases, selectedTargets, false);
+    }
+
+    public boolean runReleasePhases(Set<Phase> phases) {
+        return runPhases(phases, onlyTargets, true);
+    }
+
+    private boolean runPhases(Set<Phase> phases, List<String> selectedTargets, boolean release) {
         ManifestParseResult parse = readManifest();
         boolean hasManifest = manifestPath() != null;
         if (hasManifest) {
@@ -246,11 +255,15 @@ public final class BuildContext {
         ManifestProfileModel activeProfile = ManifestProfiles.activeProfile(raw);
         ManifestRootModel effective = configuration.effective();
 
+        if (release) {
+            effective.setSkipTests(false);
+        }
+
         printProjectHeader(effective, hasManifest);
         long startNanos = System.nanoTime();
 
         String buildMode = activeProfile != null && notBlank(activeProfile.getBuildType())
-                ? activeProfile.getBuildType() : "Debug";
+                ? activeProfile.getBuildType() : release ? "Release" : "Debug";
 
         BuildSystem buildSystem = BuildSystemDetector.detect(projectPath, hasManifest);
         if (!hasManifest && buildSystem == BuildSystem.DEFAULT
@@ -295,7 +308,7 @@ public final class BuildContext {
                 buildOutput(), line -> printer.println(Severity.INFO, "{}", line),
                 jobs, selectedTargets, incremental, null, options);
 
-        LifecycleResult result = LifecycleExecutor.run(ctx, phases);
+        LifecycleResult result = release ? ReleaseExecutor.run(ctx, phases) : LifecycleExecutor.run(ctx, phases);
 
         long elapsedMillis = (System.nanoTime() - startNanos) / 1_000_000L;
         printBuildSummary(result, elapsedMillis);

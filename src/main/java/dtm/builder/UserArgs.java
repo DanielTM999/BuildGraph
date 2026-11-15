@@ -41,6 +41,7 @@ public final class UserArgs {
     public static final String LOCK = "lock";
     public static final String INTERACTIVE = "interactive";
     public static final String NO_INCREMENTAL = "no_incremental";
+    public static final String RELEASE = "release";
 
     private static final Set<String> RESERVED = Set.of(CLEAN, BUILD, "package", INSTALL, TEST, REFRESH, LOCK);
 
@@ -163,7 +164,11 @@ public final class UserArgs {
     }
 
     public boolean hasNoIncremental() {
-        return flag(NO_INCREMENTAL);
+        return hasRelease() || flag(NO_INCREMENTAL);
+    }
+
+    public boolean hasRelease() {
+        return flag(RELEASE);
     }
 
     public boolean hasSkipTests() {
@@ -216,7 +221,7 @@ public final class UserArgs {
         var defaults = BuildOptions.defaults();
         return new BuildOptions(size("--memory-limit", 0), size("--memory-per-job", 0),
                 argsMap.containsKey("--cache-dir") ? Path.of(argsMap.get("--cache-dir")) : defaults.cacheDirectory(),
-                size("--cache-size", defaults.cacheSize()), !flag("--no-cache"), flag("--profile-build"), size("--memory-reserve", 0));
+                size("--cache-size", defaults.cacheSize()), !hasRelease() && !flag("--no-cache"), flag("--profile-build"), size("--memory-reserve", 0));
     }
 
     private long size(String key, long fallback) {
@@ -271,6 +276,7 @@ public final class UserArgs {
                 case CLEAN, BUILD, INSTALL, TEST, REFRESH, LOCK -> argsMap.put(arg, "true");
                 case "--interactive", "-i" -> argsMap.put(INTERACTIVE, "true");
                 case "--no-incremental" -> argsMap.put(NO_INCREMENTAL, "true");
+                case "--release" -> argsMap.put(RELEASE, "true");
                 case "--no-cache", "--profile-build" -> argsMap.put(arg, "true");
                 case "--memory-limit", "--memory-per-job", "--memory-reserve", "--cache-size", "--cache-dir" -> {
                     i = readValue(args, i, arg);
@@ -313,6 +319,14 @@ public final class UserArgs {
                 }
                 default -> invalid("Argumento desconhecido: " + arg);
             }
+        }
+
+        if (hasRelease()) {
+            if (isInteractive() || hasCompileCommands() || hasSkipTests()) {
+                invalid("--release nao aceita --interactive, --compile-commands ou --skip-tests");
+            }
+            argsMap.put(BUILD, "true");
+            argsMap.put(TEST, "true");
         }
 
         if (!hasClean() && !hasBuild() && !hasInstall() && !hasTest() && !hasRefresh() && !hasLock() && !isInteractive() && !hasCompileCommands() && !hasVersion()) {
