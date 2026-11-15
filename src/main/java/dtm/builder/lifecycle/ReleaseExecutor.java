@@ -17,6 +17,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.List;
 
 public final class ReleaseExecutor {
     private ReleaseExecutor() { }
@@ -24,11 +25,13 @@ public final class ReleaseExecutor {
     public static LifecycleResult run(LifecycleContext ctx, Set<Phase> requested) {
         Set<Path> required = new HashSet<>();
         Set<Path> deliverables = new HashSet<>();
+        ReleaseCleanup cleanup;
         try {
             if (ctx.buildSystem() != BuildSystem.MANIFEST && ctx.buildSystem() != BuildSystem.DEFAULT)
                 return LifecycleResult.fail("--release requer build direto por manifest ou descoberta de fontes; backend "
                         + ctx.buildSystem());
             validateBuildDirectory(ctx);
+            cleanup = new ReleaseCleanup(ctx.manifest() == null ? List.of() : ctx.manifest().getReleaseCleanup());
             boolean msvc = ctx.toolchain() != null && ctx.toolchain().isMsvc();
             var graph = TargetSelection.resolve(ctx.manifest(), ctx.projectPath(), msvc, ctx.onlyTargets());
             Set<String> dependencies = new HashSet<>();
@@ -73,12 +76,13 @@ public final class ReleaseExecutor {
                 result = LifecycleResult.fail("Release: " + e.getMessage());
             } finally {
                 try {
-                    prune(ctx.buildDir(), ctx.projectPath(), result.success() ? deliverables : Set.of());
+                    cleanCompilation(ctx.buildDir(), ctx.projectPath(), result.success() ? deliverables : Set.of());
+                    if (result.success()) cleanup.clean(ctx.buildDir());
                 } catch (IOException e) {
                     result = LifecycleResult.fail(result.message() + "; limpeza da release falhou: " + e.getMessage());
                 }
             }
-            if (result.success()) ctx.info().accept("Release pronta: apenas artefatos publicaveis em " + ctx.buildDir());
+            if (result.success()) ctx.info().accept("Release pronta: artefatos e recursos preservados; intermediarios removidos de " + ctx.buildDir());
             return result;
         } catch (IOException e) {
             return LifecycleResult.fail("Release: " + e.getMessage());
@@ -91,6 +95,41 @@ public final class ReleaseExecutor {
         if (project.startsWith(build))
             throw new IOException("outputDir nao pode ser o projeto nem um diretorio ancestral: " + build);
         rejectSymbolicParents(ctx.buildDir(), ctx.projectPath());
+    }
+
+    private static void cleanCompilation(Path directory, Path project, Set<Path> keep) throws IOException {
+        Path root = directory.toAbsolutePath().normalize();
+        rejectSymbolicParents(root, project);
+        for (Path output : NativeArtifacts.recordedOutputs(root)) {
+            if (keep.contains(output)) continue;
+            rejectSymbolicParents(output.getParent(), project);
+            Files.deleteIfExists(output);
+        }
+        for (String name : new String[] {".obj", ".buildgraph-state", ".buildgraph-outputs", ".clangd"})
+            deleteTree(root.resolve(name));
+        if (Files.isDirectory(root, LinkOption.NOFOLLOW_LINKS)) {
+            try (var files = Files.list(root)) {
+                for (Path file : files.filter(path -> path.getFileName().toString().startsWith(".buildgraph-args-")
+                        && path.getFileName().toString().endsWith(".rsp")).toList())
+                    Files.delete(file);
+            }
+        }
+    }
+
+    private static void deleteTree(Path path) throws IOException {
+        if (!Files.exists(path, LinkOption.NOFOLLOW_LINKS)) return;
+        Files.walkFileTree(path, new SimpleFileVisitor<>() {
+            @Override public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                Files.delete(file);
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override public FileVisitResult postVisitDirectory(Path dir, IOException error) throws IOException {
+                if (error != null) throw error;
+                Files.delete(dir);
+                return FileVisitResult.CONTINUE;
+            }
+        });
     }
 
     private static void rejectSymbolicParents(Path directory, Path project) throws IOException {

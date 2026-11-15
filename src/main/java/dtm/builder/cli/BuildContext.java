@@ -18,6 +18,7 @@ import dtm.builder.lifecycle.LifecycleExecutor;
 import dtm.builder.lifecycle.LifecycleResult;
 import dtm.builder.lifecycle.Phase;
 import dtm.builder.lifecycle.ReleaseExecutor;
+import dtm.builder.lifecycle.TaskExecutor;
 import dtm.builder.manifest.ManifestParser;
 import dtm.builder.manifest.ManifestProfiles;
 import dtm.builder.manifest.ManifestResolver;
@@ -327,6 +328,10 @@ public final class BuildContext {
     }
 
     private void printBuildSummary(LifecycleResult result, long elapsedMillis) {
+        if (Boolean.parseBoolean(System.getenv(TaskExecutor.NESTED_BUILD))) {
+            if (!result.success()) printer.println(Severity.ERROR, "{}", result.message());
+            return;
+        }
         printer.println(Severity.INFO, "");
         printer.println(Severity.INFO, "{}", SEPARATOR);
         if (result.success()) {

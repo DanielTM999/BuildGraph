@@ -54,6 +54,10 @@ public final class LifecycleExecutor {
             if (!phases.contains(phase)) {
                 continue;
             }
+            if (phase == Phase.TEST && ctx.manifest() != null && ctx.manifest().isSkipTests()) {
+                ctx.output().accept("Testes ignorados (skipTests)");
+                continue;
+            }
             ctx.info().accept("");
             ctx.info().accept("--- " + phase.name().toLowerCase() + " ---");
 

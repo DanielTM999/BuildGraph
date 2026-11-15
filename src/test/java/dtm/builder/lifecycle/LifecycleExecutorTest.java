@@ -12,8 +12,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.nio.file.Files;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -61,18 +65,51 @@ class LifecycleExecutorTest {
         var placeholders = new PlaceholderResolver(
                 new PlaceholderContext(projectPath, manifest));
         List<List<String>> commands = new ArrayList<>();
+        List<Map<String, String>> environments = new ArrayList<>();
         var context = new LifecycleContext(projectPath, manifest, null, BuildSystem.MANIFEST, null,
                 projectPath.resolve("packages"), projectPath.resolve("build"), "Debug", placeholders,
                 ignored -> { }, ignored -> { }, 0, List.of(), true,
-                (command, dir, env, out) -> { commands.add(command); return 0; });
+                (command, dir, env, out) -> { commands.add(command); environments.add(env); return 0; });
 
         assertTrue(TaskExecutor.runPhaseTasks(context, Phase.TEST, "before"));
 
         List<String> expected = new ArrayList<>(TaskExecutor.selfCommand());
         expected.addAll(List.of("fixtures/native", "build", "-p", "linux-x86_64-debug"));
         assertEquals(List.of(expected), commands);
+        assertEquals("true", environments.getFirst().get(TaskExecutor.NESTED_BUILD));
         assertEquals(Main.class.getName(),
                 TaskExecutor.selfCommand().getLast());
+    }
+
+    @Test
+    void nestedBuildsPrintOnlyOneFinalSummaryAndKeepFailureDetails() throws Exception {
+        Path child = Files.createDirectories(projectPath.resolve("child"));
+        Files.writeString(projectPath.resolve("Manifest.json"), """
+                {"name":"parent","tasks":[{"id":"child","phase":"clean","when":"before",
+                "command":"${buildgraph.command}","args":["child","clean"]}]}
+                """);
+        for (boolean fail : List.of(false, true)) {
+            Files.writeString(child.resolve("Manifest.json"), fail ? """
+                    {"name":"child","tasks":[{"id":"failure","phase":"clean","when":"before",
+                    "command":"missing-buildgraph-fixture-command"}]}
+                    """ : "{\"name\":\"child\"}");
+            var command = new ArrayList<>(TaskExecutor.selfCommand());
+            command.addAll(List.of(projectPath.toString(), "clean", "--format", "json"));
+            Path log = projectPath.resolve("nested-" + fail + ".log");
+            Process process = new ProcessBuilder(command).directory(projectPath.toFile())
+                    .redirectErrorStream(true).redirectOutput(log.toFile()).start();
+            String output;
+            try {
+                assertTrue(process.waitFor(45, TimeUnit.SECONDS));
+                output = Files.readString(log, StandardCharsets.UTF_8);
+            } finally {
+                if (process.isAlive()) process.destroyForcibly();
+            }
+            assertEquals(fail ? 1 : 0, process.exitValue(), output);
+            assertEquals(1, output.split("BUILD " + (fail ? "FAILURE" : "SUCCESS"), -1).length - 1, output);
+            assertEquals(1, output.split("Total time:", -1).length - 1, output);
+            if (fail) assertTrue(output.contains("missing-buildgraph-fixture-command"), output);
+        }
     }
 
     private LifecycleContext context(BuildSystem buildSystem, ManifestRootModel manifest) {

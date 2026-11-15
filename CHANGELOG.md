@@ -32,11 +32,17 @@ Todas as mudanças relevantes serão documentadas neste arquivo. O formato segue
 
 ### Adicionado
 
+- `releaseCleanup` no manifest e nos profiles permite configurar remoções adicionais ao final
+  de `--release`; bibliotecas estáticas são preservadas por padrão.
 - `--release` reconstrói builds diretos sem cache, executa os testes e limpa a saída para publicação,
   preservando apenas os artefatos finais e as bibliotecas de importação necessárias.
 
 ### Corrigido
 
+- A limpeza de `--release` remove os intermediários de compilação e preserva recursos preparados
+  pelo projeto, como `stdlib`, headers, assets e documentação.
+- `--skip-tests` ignora também as tarefas `before` e `after` da fase de testes.
+- Builds iniciados por tarefas não imprimem um segundo resumo final; falhas continuam sendo reportadas.
 - `--release` aceita `--skip-tests` e respeita `skipTests` do manifest, mantendo o build do zero
   sem cache e a limpeza dos arquivos intermediários.
 

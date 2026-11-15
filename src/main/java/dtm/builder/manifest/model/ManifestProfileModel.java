@@ -1,6 +1,7 @@
 package dtm.builder.manifest.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
@@ -29,6 +30,12 @@ public class ManifestProfileModel extends NativeOptions {
     private String outputDir;
     private String packagesBase;
     private Boolean library;
+
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    @JsonSetter(nulls = Nulls.SKIP)
+    @JacksonXmlElementWrapper(localName = "releaseCleanup")
+    @JacksonXmlProperty(localName = "path")
+    private List<String> releaseCleanup = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.SKIP)
     @JacksonXmlElementWrapper(localName = "repositories")
@@ -98,6 +105,14 @@ public class ManifestProfileModel extends NativeOptions {
 
     public String getBuildType() {
         return buildType;
+    }
+
+    public List<String> getReleaseCleanup() {
+        return releaseCleanup;
+    }
+
+    public void setReleaseCleanup(List<String> releaseCleanup) {
+        this.releaseCleanup = releaseCleanup != null ? releaseCleanup : new ArrayList<>();
     }
 
     public void setBuildType(String buildType) {

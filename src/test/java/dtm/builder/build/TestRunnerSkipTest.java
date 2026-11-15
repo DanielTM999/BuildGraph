@@ -5,6 +5,7 @@ import dtm.builder.lifecycle.LifecycleExecutor;
 import dtm.builder.lifecycle.Phase;
 import dtm.builder.manifest.model.ManifestRootModel;
 import dtm.builder.manifest.model.ManifestTargetModel;
+import dtm.builder.manifest.model.ManifestTaskModel;
 import dtm.builder.placeholder.PlaceholderContext;
 import dtm.builder.placeholder.PlaceholderResolver;
 import dtm.builder.repo.GlobalRepository;
@@ -62,6 +63,18 @@ class TestRunnerSkipTest {
     void skipTestsBuildsProjectButDoesNotCompileOrRunSuite() throws Exception {
         var m = manifest();
         m.setSkipTests(true);
+        List<ManifestTaskModel> hooks = new ArrayList<>();
+        for (String phase : List.of("build", "test")) {
+            for (String when : List.of("before", "after")) {
+                var hook = new ManifestTaskModel();
+                hook.setId(phase + "-" + when);
+                hook.setPhase(phase);
+                hook.setWhen(when);
+                hook.setCommand(phase + "-" + when);
+                hooks.add(hook);
+            }
+        }
+        m.setTasks(hooks);
         var tools = new NativeBuildTest.FakeTools();
         List<String> output = new ArrayList<>();
         var result = LifecycleExecutor.run(context(m, tools, output), Set.of(Phase.TEST));
@@ -70,6 +83,9 @@ class TestRunnerSkipTest {
         assertFalse(compiled(tools, "tests/main.c"));
         assertFalse(tools.commands.stream().anyMatch(c -> c.getFirst().contains("_tests")));
         assertTrue(output.contains("Testes ignorados (skipTests)"));
+        assertTrue(tools.commands.stream().anyMatch(c -> c.getFirst().equals("build-before")));
+        assertTrue(tools.commands.stream().anyMatch(c -> c.getFirst().equals("build-after")));
+        assertFalse(tools.commands.stream().anyMatch(c -> c.getFirst().startsWith("test-")));
     }
 
     @Test

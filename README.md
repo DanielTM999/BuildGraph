@@ -140,20 +140,40 @@ BuildGraph . --release --skip-tests
 `--release` executa `clean → build → test`, além de `install` quando solicitado. O modo usa
 `Release` por padrão e respeita o `buildType` do profile ativo. Recompila todas as fontes sem
 ler nem gravar o cache compartilhado de objetos. Ao terminar, remove objetos intermediários,
-arquivos de dependências, estado incremental, inventários, executáveis dos testes, relatórios e
-temporários. Permanecem apenas os artefatos declarados dos targets selecionados e suas
-bibliotecas; bibliotecas de importação `.lib` de DLLs também são preservadas. Targets `object`
+arquivos de dependências, estado incremental, inventários, executáveis dos testes e temporários
+gerados pela compilação. Preserva os artefatos dos targets selecionados, suas bibliotecas e
+arquivos preparados pelas tarefas do projeto, como `stdlib`, `include`, assets e documentação.
+Bibliotecas de importação `.lib` de DLLs também são preservadas. Targets `object`
 usados apenas como dependências são removidos; objetos pedidos explicitamente são preservados.
 
 A limpeza substitui **todo** o `outputDir`, inclusive ao usar `--target`; saídas antigas de outros
 targets são removidas. Falhas de compilação, teste ou tarefas do lifecycle mantêm o código de
-erro e limpam a saída, sem deixar uma release parcial. Os testes terminam antes de `install`.
+erro e removem os artefatos de compilação, preservando os demais arquivos do projeto.
+Os testes terminam antes de `install`.
 `--skip-tests` ou `skipTests: true` no manifest permitem gerar a release sem compilar nem executar
-os testes, mantendo a reconstrução sem cache e a limpeza da saída. Exclusões individuais de testes
+os testes nem as tarefas `before`/`after` da fase `test`, mantendo a reconstrução sem cache e a
+limpeza da saída. Exclusões individuais de testes
 continuam válidas. `--interactive` e `--compile-commands` são incompatíveis com `--release`.
 
 Disponível para builds diretos por manifest ou descoberta de fontes C/C++/ASM. CMake, Meson e
 Make são recusados sem limpar a saída, pois suas regras de entrega são controladas pelo backend.
+
+Por padrão, bibliotecas estáticas `.a`/`.lib` são preservadas. Para removê-las ou remover outros
+arquivos adicionais ao final de uma release bem-sucedida, configure `releaseCleanup` na raiz
+do manifest ou no profile ativo:
+
+```json
+{
+  "releaseCleanup": ["*.a"]
+}
+```
+
+A lista aceita arquivos, diretórios e globs relativos a `outputDir`. Um padrão sem `/`, como
+`*.a`, casa com o nome em qualquer subpasta; `**/*.a` também inclui arquivos na raiz. Caminhos
+absolutos ou com `..` são recusados. As regras do profile são somadas às da raiz, sem duplicatas.
+Os padrões removem os arquivos correspondentes, incluindo artefatos finais quando selecionados
+explicitamente. A opção não afeta builds normais. Uma lista ausente ou vazia não faz remoções
+adicionais; `.obj`, `.buildgraph-state` e `.buildgraph-outputs` continuam sendo limpos pelo modo release.
 
 ### Compilação incremental
 
@@ -564,6 +584,7 @@ Campos desconhecidos são ignorados. Listas e mapas nulos são tratados como vaz
 | `testFolder` | string | Pasta de fontes de teste relativa ao projeto. Ausente ou vazia usa `<projeto>/tests`. |
 | `testMain` | string | Arquivo com `main()`, relativo a `testFolder`. Ausente ou vazio procura exatamente um `main()` na pasta. |
 | `skipTests` | boolean | `true` faz a fase `test` terminar com sucesso sem compilar nem executar testes. |
+| `releaseCleanup` | string[] | Arquivos, pastas ou globs removidos ao final de `--release`; vazio por padrão. Aceito também nos profiles. |
 | `excludeTests` | string[] | Testes ignorados: arquivos, pastas ou globs relativos a `testFolder` (veja [Ignorar testes](#ignorar-testes)). No XML, `<excludeTests><excludeTest>…</excludeTest></excludeTests>`. |
 | `includes` | string[] | Pastas de headers adicionadas à linha de compilação. |
 | `defines` | string[] | Macros; `-D` ou `/D` é acrescentado quando necessário. |
@@ -1067,7 +1088,8 @@ Os modos são:
 ## Lifecycle e instalação
 
 Cada fase executa suas tasks `before`, depois a operação da fase e finalmente suas tasks `after`.
-Uma falha interrompe as fases seguintes.
+Uma falha interrompe as fases seguintes. Com `skipTests`/`--skip-tests`, toda a fase `test` é
+ignorada, incluindo suas tarefas `before` e `after`.
 
 `package` é um alias de `build`, inclusive nas tasks e no modo interativo; não cria um arquivo
 de distribuição nem uma segunda execução dos hooks. `build package` executa a fase uma vez.

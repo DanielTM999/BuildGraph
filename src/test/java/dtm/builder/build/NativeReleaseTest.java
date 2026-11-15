@@ -107,9 +107,52 @@ class NativeReleaseTest {
         assertFalse(Files.exists(project.resolve("build/.obj")));
     }
 
+    @Test void staticLibrariesAreKeptByDefaultAndRemovedOnlyWhenConfigured() throws Exception {
+        var manifest = manifest();
+        manifest.setSkipTests(true);
+        var tools = new NativeBuildTest.FakeTools();
+        var ctx = context(manifest, tools);
+        var result = ReleaseExecutor.run(ctx, Set.of(Phase.BUILD));
+        assertTrue(result.success(), result.message());
+        assertEquals(Set.of("libbase.a", appName()), files());
+
+        manifest.setReleaseCleanup(List.of("*.a"));
+        result = ReleaseExecutor.run(ctx, Set.of(Phase.BUILD));
+        assertTrue(result.success(), result.message());
+        assertEquals(Set.of(appName()), files());
+        assertFalse(Files.exists(project.resolve("build/.obj")));
+        assertFalse(Files.exists(project.resolve("build/.buildgraph-outputs")));
+
+        assertTrue(LifecycleExecutor.run(ctx, Set.of(Phase.BUILD)).success());
+        assertTrue(Files.exists(project.resolve("build/libbase.a")));
+    }
+
+    @Test void invalidCleanupDoesNotCleanExistingOutput() throws Exception {
+        var manifest = manifest();
+        manifest.setReleaseCleanup(List.of("../outside"));
+        Files.createDirectories(project.resolve("build"));
+        Files.writeString(project.resolve("build/keep"), "existing");
+        var tools = new NativeBuildTest.FakeTools();
+        var result = ReleaseExecutor.run(context(manifest, tools), Set.of(Phase.BUILD));
+        assertFalse(result.success());
+        assertTrue(result.message().contains("releaseCleanup"));
+        assertEquals(Set.of("keep"), files());
+        assertTrue(tools.commands.isEmpty());
+    }
+
     @Test void skippedTestsStillRebuildCleanOutputAndAllowInstall() throws Exception {
         var manifest = manifest();
         manifest.setSkipTests(true);
+        var testHooks = new java.util.ArrayList<ManifestTaskModel>();
+        for (String when : List.of("before", "after")) {
+            var hook = new ManifestTaskModel();
+            hook.setId("must-not-run-" + when);
+            hook.setPhase("test");
+            hook.setWhen(when);
+            hook.setCommand("must-not-run-test-hook");
+            testHooks.add(hook);
+        }
+        manifest.setTasks(testHooks);
         Files.writeString(project.resolve("tests/main.c"), "invalid test source");
         Files.createDirectories(project.resolve("build/test-reports"));
         Files.writeString(project.resolve("build/test-reports/stale.txt"), "stale");
@@ -122,7 +165,7 @@ class NativeReleaseTest {
             assertEquals(Set.of("libbase.a", appName()), files());
             assertEquals(2, tools.commands.stream().filter(c -> c.contains("-c")).count());
             assertTrue(tools.commands.stream().flatMap(List::stream)
-                    .noneMatch(arg -> arg.contains("sample_tests") || arg.contains("tests/main.c")
+                    .noneMatch(arg -> arg.contains("must-not-run") || arg.contains("sample_tests") || arg.contains("tests/main.c")
                             || arg.contains("tests\\main.c")));
             assertFalse(Files.exists(project.resolve("build/.obj")));
             assertFalse(Files.exists(project.resolve("build/.buildgraph-state")));
@@ -135,22 +178,28 @@ class NativeReleaseTest {
         }
     }
 
-    @Test void selectedReleaseRemovesOldUnselectedArtifactsAndCleansAfterHooks() throws Exception {
+    @Test void selectedReleaseKeepsStagedResourcesAndRemovesCompilationFiles() throws Exception {
         var manifest = manifest();
         var hook = new ManifestTaskModel();
-        hook.setId("after-test");
-        hook.setPhase("test");
+        hook.setId("stage-runtime");
+        hook.setPhase("build");
         hook.setWhen("after");
-        hook.setCommand("make-junk");
+        hook.setCommand("stage-runtime");
         manifest.setTasks(List.of(hook));
         var tools = new NativeBuildTest.FakeTools();
         Files.createDirectories(project.resolve("build"));
         Files.writeString(project.resolve("build/old-app.exe"), "stale");
         ProcessExecutor executor = (command, cwd, env, out) -> {
-            if (command.getFirst().equals("make-junk")) {
+            if (command.getFirst().equals("stage-runtime")) {
                 try {
-                    Files.createDirectories(project.resolve("build/test-reports"));
-                    Files.writeString(project.resolve("build/test-reports/log.txt"), "temporary");
+                    Files.createDirectories(project.resolve("build/stdlib"));
+                    Files.writeString(project.resolve("build/stdlib/stdlib.vpk"), "runtime");
+                    Files.writeString(project.resolve("build/stdlib/stdlib.vdoc"), "docs");
+                    Files.createDirectories(project.resolve("build/include/vertex/native"));
+                    Files.writeString(project.resolve("build/include/vertex/native/vertex_native.h"), "header");
+                    Files.createDirectories(project.resolve("build/.obj/generated"));
+                    Files.writeString(project.resolve("build/.obj/generated/temp.o"), "intermediate");
+                    Files.writeString(project.resolve("build/.buildgraph-args-stale.rsp"), "response");
                 } catch (Exception e) { throw new RuntimeException(e); }
                 return 0;
             }
@@ -158,8 +207,12 @@ class NativeReleaseTest {
         };
         var result = ReleaseExecutor.run(context(manifest, executor, "base"), Set.of(Phase.BUILD));
         assertTrue(result.success(), result.message());
-        assertEquals(Set.of("libbase.a"), files());
-        assertFalse(Files.exists(project.resolve("build/test-reports")));
+        assertEquals(Set.of("libbase.a", Path.of("stdlib", "stdlib.vpk").toString(),
+                Path.of("stdlib", "stdlib.vdoc").toString(),
+                Path.of("include", "vertex", "native", "vertex_native.h").toString()), files());
+        assertFalse(Files.exists(project.resolve("build/.obj")));
+        assertFalse(Files.exists(project.resolve("build/.buildgraph-state")));
+        assertFalse(Files.exists(project.resolve("build/.buildgraph-outputs")));
     }
 
     @Test void invalidSelectionAndExternalBackendsDoNotClean() throws Exception {

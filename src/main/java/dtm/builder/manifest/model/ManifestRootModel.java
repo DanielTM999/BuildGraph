@@ -49,6 +49,12 @@ public class ManifestRootModel extends NativeOptions {
     @JacksonXmlProperty(localName = "excludeTest")
     private List<String> excludeTests = new ArrayList<>();
 
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    @JsonSetter(nulls = Nulls.SKIP)
+    @JacksonXmlElementWrapper(localName = "releaseCleanup")
+    @JacksonXmlProperty(localName = "path")
+    private List<String> releaseCleanup = new ArrayList<>();
+
     @JsonSetter(nulls = Nulls.SKIP)
     @JacksonXmlElementWrapper(localName = "repositories")
     @JacksonXmlProperty(localName = "repository")
@@ -371,6 +377,14 @@ public class ManifestRootModel extends NativeOptions {
 
     public List<ManifestTargetModel> getTargets() {
         return targets;
+    }
+
+    public List<String> getReleaseCleanup() {
+        return releaseCleanup;
+    }
+
+    public void setReleaseCleanup(List<String> releaseCleanup) {
+        this.releaseCleanup = releaseCleanup != null ? releaseCleanup : new ArrayList<>();
     }
 
     public void setTargets(List<ManifestTargetModel> targets) {

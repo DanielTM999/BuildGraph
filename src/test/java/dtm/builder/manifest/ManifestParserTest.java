@@ -13,6 +13,29 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ManifestParserTest {
 
     @Test
+    void releaseCleanupParsesInJsonAndXmlAndDefaultsToEmpty() {
+        var json = ManifestParser.readManifest("""
+                {"releaseCleanup":["*.a","temporary"],"activeProfile":"release",
+                 "profiles":{"release":{"releaseCleanup":["*.lib"]}}}
+                """, false);
+        var xml = ManifestParser.readManifest("""
+                <Manifest>
+                  <releaseCleanup><path>*.a</path><path>temporary</path></releaseCleanup>
+                  <activeProfile>release</activeProfile>
+                  <profiles><release><releaseCleanup><path>*.lib</path></releaseCleanup></release></profiles>
+                </Manifest>
+                """, true);
+        assertTrue(json.isOk());
+        assertTrue(xml.isOk());
+        for (var parsed : List.of(json, xml)) {
+            assertEquals(List.of("*.a", "temporary"), parsed.getManifest().getReleaseCleanup());
+            assertEquals(List.of("*.a", "temporary", "*.lib"),
+                    ManifestProfiles.effective(parsed.getManifest()).getReleaseCleanup());
+        }
+        assertTrue(ManifestProfiles.effective(new ManifestRootModel()).getReleaseCleanup().isEmpty());
+    }
+
+    @Test
     void parsesRepositoriesFromJsonAndXml() {
         ManifestRootModel json = ManifestParser.readManifest(
                 "{\"repositories\":[\"repo/a\",\"D:/repo-b\"]}", false).getManifest();
@@ -60,6 +83,7 @@ class ManifestParserTest {
         String written = ManifestParser.writeString(ManifestParser.readManifest("{\"name\":\"a\"}", false).getManifest(), false);
         assertFalse(written.contains("skipTests"), written);
         assertFalse(written.contains("excludeTests"), written);
+        assertFalse(written.contains("releaseCleanup"), written);
     }
 
     private static final String JSON = """

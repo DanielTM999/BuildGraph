@@ -19,6 +19,8 @@ import java.util.function.Consumer;
 
 public final class TaskExecutor {
 
+    public static final String NESTED_BUILD = "BUILDGRAPH_NESTED_BUILD";
+
     private TaskExecutor() {
     }
 
@@ -47,6 +49,7 @@ public final class TaskExecutor {
 
             Path workingDir = resolveWorkingDir(ctx, resolver.resolve(task.getWorkingDir()));
             Map<String, String> env = buildEnv(ctx.manifest(), task, resolver);
+            env.put(NESTED_BUILD, "true");
 
             ctx.output().accept("[task " + task.identity() + "] + " + String.join(" ", cmd));
             int exit = ctx.executor().run(cmd, workingDir, env, ctx.output());

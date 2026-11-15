@@ -113,6 +113,8 @@ public final class ManifestProfiles {
         out.setTestMain(raw.getTestMain());
         out.setSkipTests(raw.isSkipTests());
         out.setExcludeTests(raw.getExcludeTests());
+        out.setReleaseCleanup(ManifestMerge.mergeAdditive(raw.getReleaseCleanup(),
+                profile == null ? null : profile.getReleaseCleanup(), null));
 
         boolean library = raw.isLibrary();
         if (profile != null && profile.getLibrary() != null) {

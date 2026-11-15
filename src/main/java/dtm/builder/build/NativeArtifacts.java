@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.LinkOption;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -99,6 +100,27 @@ public final class NativeArtifacts {
     private static List<String> read(Path buildDir, String id) throws IOException {
         Path file = inventory(buildDir, id);
         return Files.isRegularFile(file) ? List.of(JSON.readValue(file.toFile(), String[].class)) : List.of();
+    }
+
+    public static Set<Path> recordedOutputs(Path buildDir) throws IOException {
+        Path root = buildDir.toAbsolutePath().normalize();
+        Path directory = root.resolve(".buildgraph-outputs");
+        Set<Path> outputs = new LinkedHashSet<>();
+        if (Files.isSymbolicLink(directory)) throw new IOException("Inventario simbolico: " + directory);
+        if (!Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) return outputs;
+        try (var inventories = Files.list(directory)) {
+            for (Path file : inventories.filter(path -> path.getFileName().toString().endsWith(".json")).toList()) {
+                if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS))
+                    throw new IOException("Inventario invalido: " + file);
+                for (String stored : JSON.readValue(file.toFile(), String[].class)) {
+                    Path path = root.resolve(stored).normalize();
+                    if (!path.startsWith(root) || path.equals(root))
+                        throw new IOException("Saida fora de build: " + path);
+                    outputs.add(path);
+                }
+            }
+        }
+        return outputs;
     }
 
     public static void clean(Path buildDir, ManifestRootModel root, ResolvedTarget target, boolean msvc) throws IOException {
