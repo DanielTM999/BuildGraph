@@ -18,7 +18,6 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Set;
 
-/** A fresh, tested build whose output directory contains only deliverable artifacts. */
 public final class ReleaseExecutor {
     private ReleaseExecutor() { }
 
@@ -30,14 +29,11 @@ public final class ReleaseExecutor {
                 return LifecycleResult.fail("--release requer build direto por manifest ou descoberta de fontes; backend "
                         + ctx.buildSystem());
             validateBuildDirectory(ctx);
-            if (ctx.manifest() != null && ctx.manifest().isSkipTests())
-                return LifecycleResult.fail("--release requer testes habilitados");
             boolean msvc = ctx.toolchain() != null && ctx.toolchain().isMsvc();
             var graph = TargetSelection.resolve(ctx.manifest(), ctx.projectPath(), msvc, ctx.onlyTargets());
             Set<String> dependencies = new HashSet<>();
             graph.targets().forEach(target -> dependencies.addAll(target.dependsOn()));
             for (var target : graph.targets()) {
-                // Object dependencies are link inputs; explicitly requested object targets are deliverables.
                 if (target.type() == TargetType.OBJECT && dependencies.contains(target.id())
                         && !ctx.onlyTargets().contains(target.id())) continue;
                 Path artifact = NativeArtifacts.artifact(ctx.buildDir(), ctx.manifest(), target, msvc)
@@ -66,7 +62,6 @@ public final class ReleaseExecutor {
         try (var lock = BuildDirectoryLock.acquire(ctx.buildDir())) {
             LifecycleResult result = LifecycleResult.fail("Release interrompida");
             try {
-                // Release replaces the entire output, even when --target selects only part of the graph.
                 prune(ctx.buildDir(), ctx.projectPath(), Set.of());
                 result = LifecycleExecutor.run(fresh, phases);
                 if (result.success()) {
@@ -102,7 +97,6 @@ public final class ReleaseExecutor {
         Path root = directory.toAbsolutePath().normalize();
         Path boundary = project.toAbsolutePath().normalize();
         while (boundary != null && !root.startsWith(boundary)) boundary = boundary.getParent();
-        // System aliases above the project (such as macOS /var) are valid; build-local redirects are not.
         for (Path path = root; path != null && !path.equals(boundary); path = path.getParent())
             if (Files.isSymbolicLink(path))
                 throw new IOException("Release recusou diretorio simbolico: " + path);

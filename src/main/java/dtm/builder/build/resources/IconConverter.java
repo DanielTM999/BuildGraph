@@ -14,7 +14,6 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Locale;
 
-/** Image decoding and deterministic, aspect preserving icon rendering. */
 public final class IconConverter {
     private IconConverter() { }
 

@@ -20,7 +20,6 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.function.Consumer;
 
-/** Generates only the inputs needed by the selected executable format. */
 public final class ExecutableResourceBuilder {
     private static final String GENERATOR_VERSION = "1";
     private static final ObjectMapper JSON = new ObjectMapper();

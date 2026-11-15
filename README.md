@@ -134,6 +134,7 @@ executados em paralelo.
 BuildGraph . --release
 BuildGraph . build --release --target app
 BuildGraph . install --release
+BuildGraph . --release --skip-tests
 ```
 
 `--release` executa `clean → build → test`, além de `install` quando solicitado. O modo usa
@@ -147,8 +148,9 @@ usados apenas como dependências são removidos; objetos pedidos explicitamente 
 A limpeza substitui **todo** o `outputDir`, inclusive ao usar `--target`; saídas antigas de outros
 targets são removidas. Falhas de compilação, teste ou tarefas do lifecycle mantêm o código de
 erro e limpam a saída, sem deixar uma release parcial. Os testes terminam antes de `install`.
-`skipTests` do manifest é desativado nesse modo; exclusões individuais de testes continuam
-válidas. `--skip-tests`, `--interactive` e `--compile-commands` são incompatíveis com `--release`.
+`--skip-tests` ou `skipTests: true` no manifest permitem gerar a release sem compilar nem executar
+os testes, mantendo a reconstrução sem cache e a limpeza da saída. Exclusões individuais de testes
+continuam válidas. `--interactive` e `--compile-commands` são incompatíveis com `--release`.
 
 Disponível para builds diretos por manifest ou descoberta de fontes C/C++/ASM. CMake, Meson e
 Make são recusados sem limpar a saída, pois suas regras de entrega são controladas pelo backend.

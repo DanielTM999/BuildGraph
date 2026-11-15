@@ -322,8 +322,8 @@ public final class UserArgs {
         }
 
         if (hasRelease()) {
-            if (isInteractive() || hasCompileCommands() || hasSkipTests()) {
-                invalid("--release nao aceita --interactive, --compile-commands ou --skip-tests");
+            if (isInteractive() || hasCompileCommands()) {
+                invalid("--release nao aceita --interactive ou --compile-commands");
             }
             argsMap.put(BUILD, "true");
             argsMap.put(TEST, "true");

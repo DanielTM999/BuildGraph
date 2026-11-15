@@ -34,7 +34,6 @@ public final class BuildDirectoryLock implements AutoCloseable {
         FileChannel channel = null;
         try {
             local.lock.lockInterruptibly(); acquired = true;
-            // A release holds this lock across clean, build, tests and final cleanup.
             if (local.lock.getHoldCount() > 1)
                 return new BuildDirectoryLock(key, local, null, null);
             Path root = Files.createDirectories(Path.of(System.getProperty("java.io.tmpdir"), "buildgraph-locks"));

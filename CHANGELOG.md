@@ -35,6 +35,11 @@ Todas as mudanças relevantes serão documentadas neste arquivo. O formato segue
 - `--release` reconstrói builds diretos sem cache, executa os testes e limpa a saída para publicação,
   preservando apenas os artefatos finais e as bibliotecas de importação necessárias.
 
+### Corrigido
+
+- `--release` aceita `--skip-tests` e respeita `skipTests` do manifest, mantendo o build do zero
+  sem cache e a limpeza dos arquivos intermediários.
+
 ## [1.1.7] - 2026-11-14
 
 ### Adicionado

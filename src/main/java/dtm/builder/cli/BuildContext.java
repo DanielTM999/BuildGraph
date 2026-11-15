@@ -255,10 +255,6 @@ public final class BuildContext {
         ManifestProfileModel activeProfile = ManifestProfiles.activeProfile(raw);
         ManifestRootModel effective = configuration.effective();
 
-        if (release) {
-            effective.setSkipTests(false);
-        }
-
         printProjectHeader(effective, hasManifest);
         long startNanos = System.nanoTime();
 

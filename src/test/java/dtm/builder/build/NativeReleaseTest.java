@@ -107,6 +107,34 @@ class NativeReleaseTest {
         assertFalse(Files.exists(project.resolve("build/.obj")));
     }
 
+    @Test void skippedTestsStillRebuildCleanOutputAndAllowInstall() throws Exception {
+        var manifest = manifest();
+        manifest.setSkipTests(true);
+        Files.writeString(project.resolve("tests/main.c"), "invalid test source");
+        Files.createDirectories(project.resolve("build/test-reports"));
+        Files.writeString(project.resolve("build/test-reports/stale.txt"), "stale");
+        Files.writeString(project.resolve("build/sample_tests.exe"), "stale");
+        var tools = new NativeBuildTest.FakeTools();
+        var ctx = context(manifest, tools);
+        for (int run = 0; run < 2; run++) {
+            var result = ReleaseExecutor.run(ctx, Set.of(Phase.INSTALL));
+            assertTrue(result.success(), result.message());
+            assertEquals(Set.of("libbase.a", appName()), files());
+            assertEquals(2, tools.commands.stream().filter(c -> c.contains("-c")).count());
+            assertTrue(tools.commands.stream().flatMap(List::stream)
+                    .noneMatch(arg -> arg.contains("sample_tests") || arg.contains("tests/main.c")
+                            || arg.contains("tests\\main.c")));
+            assertFalse(Files.exists(project.resolve("build/.obj")));
+            assertFalse(Files.exists(project.resolve("build/.buildgraph-state")));
+            assertFalse(Files.exists(project.resolve("build/test-reports")));
+            tools.commands.clear();
+        }
+        assertFalse(Files.exists(project.resolve("cache/objects")));
+        try (var installed = Files.walk(project.resolve("repo"))) {
+            assertTrue(installed.anyMatch(path -> path.getFileName().toString().equals("libbase.a")));
+        }
+    }
+
     @Test void selectedReleaseRemovesOldUnselectedArtifactsAndCleansAfterHooks() throws Exception {
         var manifest = manifest();
         var hook = new ManifestTaskModel();
@@ -165,7 +193,6 @@ class NativeReleaseTest {
         manifest.setCxxCompiler("cl");
         manifest.setLinker("fake-link");
         manifest.setLinkerKind("msvc");
-        // This test only needs artifact packaging, so the test suite has no sources.
         Files.delete(project.resolve("tests/main.c"));
         var tools = new NativeBuildTest.FakeTools();
         ProcessExecutor executor = (command, cwd, env, out) -> {

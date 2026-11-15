@@ -19,8 +19,22 @@ class UserArgsReleaseTest {
         }
     }
 
-    @Test void releaseRejectsOptionsThatWouldBypassTheBuildOrTests() {
-        for (String option : new String[] {"--interactive", "--compile-commands", "--clangd", "--skip-tests"}) {
+    @Test void releaseAcceptsSkipTestsInEitherOrderWithoutEnablingCaches() {
+        for (String[] command : new String[][] {
+                {"--release", "--skip-tests"}, {"--skip-tests", "--release"},
+                {".", "install", "--release", "--skip-tests"}}) {
+            var args = new UserArgs(command);
+            assertFalse(args.isInvalidCommand(), args.getInvalidReason());
+            assertTrue(args.hasRelease());
+            assertTrue(args.hasSkipTests());
+            assertTrue(args.hasBuild());
+            assertTrue(args.hasNoIncremental());
+            assertFalse(args.getBuildOptions().sharedCache());
+        }
+    }
+
+    @Test void releaseRejectsOptionsThatWouldBypassTheBuild() {
+        for (String option : new String[] {"--interactive", "--compile-commands", "--clangd"}) {
             assertTrue(new UserArgs(new String[] {"--release", option}).isInvalidCommand(), option);
             assertTrue(new UserArgs(new String[] {option, "--release"}).isInvalidCommand(), option);
         }
