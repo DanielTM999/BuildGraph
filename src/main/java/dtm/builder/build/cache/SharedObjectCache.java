@@ -8,18 +8,31 @@ import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class SharedObjectCache {
     private static final int MAGIC = 0x42474f31;
     private final Path root;
     private final long limit;
+    private final Path project;
+    private final Set<String> recorded = ConcurrentHashMap.newKeySet();
     private final AtomicBoolean written = new AtomicBoolean();
     private final AtomicBoolean used = new AtomicBoolean();
 
     public SharedObjectCache(Path root, long limit) {
+        this(root, limit, null);
+    }
+    public SharedObjectCache(Path root, long limit, Path project) {
         this.root = root.toAbsolutePath().normalize();
         this.limit = limit;
+        this.project = project;
+    }
+    private void record(String key) {
+        if (project != null && recorded.add(key)) {
+            try { CacheInvalidation.record(root, project, key); }
+            catch (IOException | RuntimeException e) { recorded.remove(key); }
+        }
     }
     public Path entry(String key) {
         if (!key.matches("[a-f0-9]{64}")) throw new IllegalArgumentException("Invalid object cache key");
@@ -48,6 +61,7 @@ public final class SharedObjectCache {
             }
             if (input.read() != -1 || !new FileHasher().sha256(temporary).equals(digest)) return false;
             atomicMove(temporary, object);
+            record(key);
             try { Files.setLastModifiedTime(entry(key), FileTime.fromMillis(System.currentTimeMillis())); }
             catch (IOException ignored) { }
             return true;
@@ -72,6 +86,7 @@ public final class SharedObjectCache {
                 Files.copy(object, output);
             }
             atomicMove(temporary, destination);
+            record(key);
             written.set(true);
         } catch (IOException | RuntimeException ignored) { }
         finally { delete(temporary); }
@@ -106,6 +121,10 @@ public final class SharedObjectCache {
                 }
             }
         } catch (IOException | RuntimeException ignored) { }
+        finally {
+            if (project != null) try { CacheInvalidation.compact(root, project); }
+            catch (IOException | RuntimeException ignored) { }
+        }
     }
 
     public static void atomicMove(Path from, Path to) throws IOException {

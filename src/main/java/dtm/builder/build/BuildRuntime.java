@@ -52,7 +52,7 @@ final class BuildRuntime implements AutoCloseable {
         resources = new ResourceManager(request.jobs(), request.options());
         scheduler = new CompilationScheduler(resources, metrics);
         cache = new PreprocessedObjectCache(
-                new SharedObjectCache(request.options().cacheDirectory(), request.options().cacheSize()), hasher);
+                new SharedObjectCache(request.options().cacheDirectory(), request.options().cacheSize(), request.projectPath()), hasher);
         history = new MemoryHistory(request.options().cacheDirectory().resolveSibling("memory-history.properties"));
     }
 

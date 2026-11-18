@@ -8,6 +8,7 @@ import dtm.builder.build.SourceCollector;
 import dtm.builder.build.TargetPlatform;
 import dtm.builder.build.Toolchain;
 import dtm.builder.build.ToolchainDetector;
+import dtm.builder.build.cache.CacheInvalidation;
 import dtm.builder.build.graph.ResolvedTarget;
 import dtm.builder.build.graph.TargetResolution;
 import dtm.builder.build.graph.TargetResolver;
@@ -138,6 +139,14 @@ public final class BuildContext {
 
     public Path projectPath() {
         return projectPath;
+    }
+
+    public void invalidateLocalCache() throws IOException {
+        ManifestParseResult parse = readManifest();
+        if (!parse.isOk()) throw new IOException("Manifest invalido; nao foi possivel resolver outputDir");
+        Configuration configuration = configuration(parse);
+        CacheInvalidation.invalidateLocal(ProjectManifestFiles.resolveBuildDir(
+                projectPath, configuration.effective().getOutputDir()));
     }
 
     public void printDiagnostics() {

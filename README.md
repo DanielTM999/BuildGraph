@@ -94,6 +94,8 @@ BuildGraph executa `build`.
 | `--memory-per-job` | Estimativa base por compilação (ex.: `768M`). |
 | `--memory-reserve` | Reserva para o SO; default: 1/16 da RAM física, entre 512 MiB e 2 GiB. |
 | `--cache-dir`, `--cache-size` | Diretório dedicado e quota do cache de objetos (default: 5 GiB). |
+| `--invalidade-cache` | Remove objetos e estado incremental locais e entradas exclusivas do projeto no cache compartilhado. |
+| `--invalidade-cache-global` | Remove todas as entradas do cache compartilhado selecionado, inclusive de outros projetos. |
 | `--no-cache` | Desabilita o cache compartilhado e preserva o incremental local. |
 | `--release` | Refaz o build direto do zero, sem cache local ou compartilhado; executa testes e deixa apenas os artefatos para publicação. |
 | `--profile-build` | Emite métricas de performance no formato de saída selecionado. |
@@ -251,6 +253,31 @@ o diretório do usuário. `cacheSize` aceita os mesmos sufixos das flags, bytes 
 para desativar o cache compartilhado. JSON inválido ou chave desconhecida torna o comando inválido
 com o caminho do arquivo na mensagem. `--help` mostra o caminho efetivo.
 O fluxo é incremental local → cache compartilhado → compilador → atualização do estado.
+
+Para liberar espaço sem iniciar um build:
+
+```powershell
+java -jar BuildGraph.jar . --invalidade-cache
+java -jar BuildGraph.jar --invalidade-cache-global
+java -jar BuildGraph.jar . --invalidade-cache build
+java -jar BuildGraph.jar --invalidade-cache-global --cache-dir D:/cache/buildgraph
+```
+
+Os aliases `--invalidate-cache` e `--invalidate-cache-global` também são aceitos. Sem uma fase
+explícita, as flags apenas limpam e encerram. A limpeza por projeto respeita o `outputDir` e o
+profile selecionado, remove `.obj` e `.buildgraph-state` e preserva os artefatos finais. Entradas
+compartilhadas com outros projetos são mantidas até que o último projeto as libere. O vínculo
+com cada projeto é registrado ao gravar ou restaurar objetos nesta versão; entradas antigas
+sem vínculo só podem ser removidas pela limpeza global ou pela quota.
+
+A limpeza global remove todos os objetos do diretório de cache efetivo, inclusive os antigos;
+ela não percorre os diretórios de build dos projetos nem outras pastas de cache usadas anteriormente.
+Use as duas flags para limpar também o estado local do projeto atual. Builds em execução podem
+voltar a preencher o cache. A configuração global e arquivos alheios ao cache são preservados.
+`--cache-dir` continua sendo uma substituição somente nesta execução/sessão: não altera o
+`config.json` nem move os arquivos do diretório anterior. Para persistir a pasta, use `cacheDir`
+no arquivo global mostrado acima; `cacheSize`, por exemplo `"1G"`, reduz o limite nas próximas execuções.
+
 `--no-incremental` força compilação real e pode alimentar o cache; `--no-cache` desativa somente o
 cache compartilhado. A primeira execução após uma atualização do schema incremental pode recompilar.
 

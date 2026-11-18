@@ -55,6 +55,16 @@ class GlobalConfigTest {
         assertEquals(2L << 30, path.cacheSize());
     }
 
+    @Test void cacheDirectoryOverrideDoesNotPersistOrChangeConfig() throws IOException {
+        Path file = config("{\"cacheDir\": \"persistent\", \"cacheSize\": \"1G\"}");
+        String original = Files.readString(file);
+        assertEquals(Path.of("session"), new UserArgs(new String[]{"build", "--cache-dir", "session"})
+                .getBuildOptions().cacheDirectory());
+        assertEquals(original, Files.readString(file));
+        assertEquals(dir.resolve("persistent").toAbsolutePath().normalize(),
+                new UserArgs(new String[]{"build"}).getBuildOptions().cacheDirectory());
+    }
+
     @Test void partialConfigFallsBackPerKey() throws IOException {
         config("{\"cacheSize\": 1048576}");
         var options = BuildOptions.defaults();

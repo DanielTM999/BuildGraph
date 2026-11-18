@@ -172,6 +172,9 @@ public final class UserArgs {
         return flag(RELEASE);
     }
 
+    public boolean hasInvalidateCache() { return flag("--invalidade-cache"); }
+    public boolean hasInvalidateCacheGlobal() { return flag("--invalidade-cache-global"); }
+
     public boolean hasSkipTests() {
         return flag(SKIP_TESTS);
     }
@@ -280,6 +283,8 @@ public final class UserArgs {
                 case "--no-incremental" -> argsMap.put(NO_INCREMENTAL, "true");
                 case "--release" -> argsMap.put(RELEASE, "true");
                 case "--no-cache", "--profile-build" -> argsMap.put(arg, "true");
+                case "--invalidade-cache", "--invalidate-cache" -> argsMap.put("--invalidade-cache", "true");
+                case "--invalidade-cache-global", "--invalidate-cache-global" -> argsMap.put("--invalidade-cache-global", "true");
                 case "--memory-limit", "--memory-per-job", "--memory-reserve", "--cache-size", "--cache-dir" -> {
                     i = readValue(args, i, arg);
                     try {
@@ -331,7 +336,7 @@ public final class UserArgs {
             argsMap.put(TEST, "true");
         }
 
-        if (!hasClean() && !hasBuild() && !hasInstall() && !hasTest() && !hasRefresh() && !hasLock() && !isInteractive() && !hasCompileCommands() && !hasVersion()) {
+        if (!hasClean() && !hasBuild() && !hasInstall() && !hasTest() && !hasRefresh() && !hasLock() && !isInteractive() && !hasCompileCommands() && !hasVersion() && !hasInvalidateCache() && !hasInvalidateCacheGlobal()) {
             argsMap.put(BUILD, "true");
         }
 

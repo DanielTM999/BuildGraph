@@ -1,6 +1,7 @@
 package dtm.builder.cli;
 
 import dtm.builder.UserArgs;
+import dtm.builder.build.cache.CacheInvalidation;
 import dtm.builder.interactive.InteractiveSession;
 import dtm.builder.lifecycle.Phase;
 import dtm.builder.printer.FormaterType;
@@ -10,6 +11,7 @@ import dtm.builder.printer.exceptions.FormaterTypeException;
 import dtm.builder.repo.SyncResult;
 
 import java.nio.file.Files;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
@@ -45,6 +47,17 @@ public final class CommandDispatcher {
         }
 
         Path projectPath = Paths.get(args.getProjectPath()).toAbsolutePath().normalize();
+        if (args.hasInvalidateCacheGlobal()) {
+            try {
+                CacheInvalidation.invalidate(args.getBuildOptions().cacheDirectory(), projectPath, true);
+                printer.println(Severity.INFO, "Cache global invalidado: {}", args.getBuildOptions().cacheDirectory());
+            } catch (IOException | RuntimeException e) {
+                printer.println(Severity.ERROR, "Falha ao invalidar cache: {}", e.getMessage());
+                return 1;
+            }
+            if (!args.hasInvalidateCache() && collectPhases(args).isEmpty() && !args.hasRefresh()
+                    && !args.hasLock() && !args.isInteractive() && !args.hasCompileCommands()) return 0;
+        }
         if (!Files.exists(projectPath)) {
             printer.println(Severity.ERROR, "Diretorio do projeto nao existe: {}", projectPath);
             return 2;
@@ -59,6 +72,19 @@ public final class CommandDispatcher {
                 args.getJobs(), args.getTargets(), args.getTestMain(),
                 !args.hasNoIncremental(), args.getCCompiler(), args.getCxxCompiler(),
                 args.hasSkipTests(), args.getSkippedTests(), args.getBuildOptions());
+
+        if (args.hasInvalidateCache()) {
+            try {
+                context.invalidateLocalCache();
+                CacheInvalidation.invalidate(args.getBuildOptions().cacheDirectory(), projectPath, false);
+                printer.println(Severity.INFO, "Cache do projeto invalidado: {}", projectPath);
+            } catch (IOException | RuntimeException e) {
+                printer.println(Severity.ERROR, "Falha ao invalidar cache: {}", e.getMessage());
+                return 1;
+            }
+            if (collectPhases(args).isEmpty() && !args.hasRefresh() && !args.hasLock()
+                    && !args.isInteractive() && !args.hasCompileCommands()) return 0;
+        }
 
         if (args.hasCompileCommands()) {
             try {
@@ -233,6 +259,9 @@ public final class CommandDispatcher {
         printer.println(Severity.NONE, "  --memory-per-job <768M> estimativa base por compilacao");
         printer.println(Severity.NONE, "  --memory-reserve <512M> reserva de RAM para o sistema (padrao automatico)");
         printer.println(Severity.NONE, "  --cache-dir <path> --cache-size <5G> --no-cache");
+        printer.println(Severity.NONE, "  --invalidade-cache        remove cache local e entradas exclusivas do projeto");
+        printer.println(Severity.NONE, "  --invalidade-cache-global remove todas as entradas do cache compartilhado selecionado");
+        printer.println(Severity.NONE, "                aliases: --invalidate-cache / --invalidate-cache-global; sem fase, apenas limpa");
         printer.println(Severity.NONE, "                cacheDir/cacheSize padrao em " + dtm.builder.build.GlobalConfig.location());
         printer.println(Severity.NONE, "  --profile-build        imprime tempos e contadores de performance");
         printer.println(Severity.NONE,
