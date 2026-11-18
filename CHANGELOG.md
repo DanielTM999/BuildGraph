@@ -28,6 +28,14 @@ Todas as mudanças relevantes serão documentadas neste arquivo. O formato segue
 - `refresh` passa a atualizar o lock implicitamente.
 - Build incremental relinka quando bibliotecas precompiladas de packages mudam.
 
+## [1.1.9] - 2026-11-18
+
+### Adicionado
+
+- Configuração global `config.json` (`%LOCALAPPDATA%/BuildGraph` ou `~/.config/buildgraph`) com
+  `cacheDir` e `cacheSize` padrão do cache compartilhado; flags da CLI continuam com precedência.
+- `--help` mostra o caminho efetivo do arquivo de configuração global.
+
 ## [1.1.8] - 2026-11-14
 
 ### Adicionado

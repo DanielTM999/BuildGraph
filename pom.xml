@@ -19,7 +19,7 @@
     </licenses>
 
     <properties>
-        <revision>1.1.8</revision>
+        <revision>1.1.9</revision>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <jackson.version>2.22.2</jackson.version>
@@ -64,6 +64,11 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.6.0</version>
+                <configuration>
+                    <systemPropertyVariables>
+                        <buildgraph.config>${project.build.directory}/no-global-config.json</buildgraph.config>
+                    </systemPropertyVariables>
+                </configuration>
             </plugin>
 
             <plugin>

@@ -233,6 +233,7 @@ public final class CommandDispatcher {
         printer.println(Severity.NONE, "  --memory-per-job <768M> estimativa base por compilacao");
         printer.println(Severity.NONE, "  --memory-reserve <512M> reserva de RAM para o sistema (padrao automatico)");
         printer.println(Severity.NONE, "  --cache-dir <path> --cache-size <5G> --no-cache");
+        printer.println(Severity.NONE, "                cacheDir/cacheSize padrao em " + dtm.builder.build.GlobalConfig.location());
         printer.println(Severity.NONE, "  --profile-build        imprime tempos e contadores de performance");
         printer.println(Severity.NONE,
                 "  build         incremental por padrao em builds diretos");

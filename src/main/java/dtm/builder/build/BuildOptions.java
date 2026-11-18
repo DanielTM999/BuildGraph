@@ -10,6 +10,17 @@ public record BuildOptions(long memoryLimit, long memoryPerJob, Path cacheDirect
         this(memoryLimit, memoryPerJob, cacheDirectory, cacheSize, sharedCache, profile, 0);
     }
     public static BuildOptions defaults() {
+        return defaults(GlobalConfig.load());
+    }
+
+    public static BuildOptions defaults(GlobalConfig config) {
+        BuildOptions builtin = builtin();
+        if (config == null) return builtin;
+        return new BuildOptions(0, 0, config.cacheDirectory() == null ? builtin.cacheDirectory() : config.cacheDirectory(),
+                config.cacheSize() == null ? builtin.cacheSize() : config.cacheSize(), true, false);
+    }
+
+    public static BuildOptions builtin() {
         String base = System.getenv("LOCALAPPDATA");
         String xdg = System.getenv("XDG_CACHE_HOME");
         Path root = ToolProbe.isWindows() && base != null && !base.isBlank()
@@ -21,7 +32,7 @@ public record BuildOptions(long memoryLimit, long memoryPerJob, Path cacheDirect
     public BuildOptions {
         if (memoryLimit < 0 || memoryPerJob < 0 || cacheSize < 0 || memoryReserve < 0)
             throw new IllegalArgumentException("Memory/cache limits cannot be negative");
-        if (cacheDirectory == null) cacheDirectory = defaults().cacheDirectory();
+        if (cacheDirectory == null) cacheDirectory = builtin().cacheDirectory();
     }
 
     public static long bytes(String value) {

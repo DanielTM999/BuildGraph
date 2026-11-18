@@ -232,6 +232,24 @@ progresso. Estes limites controlam admissão e estimativas; não são limites r�
 O cache compartilhado fica separado de `<outputDir>/.buildgraph-state`. Por padrão usa
 `%LOCALAPPDATA%/BuildGraph/cache/objects-v1` no Windows e
 `${XDG_CACHE_HOME:-~/.cache}/buildgraph/objects-v1` no Linux. `clean` não o remove.
+
+Diretório e quota padrão podem ser definidos uma vez num arquivo de configuração global, usado
+sempre que `--cache-dir`/`--cache-size` não forem passados (cada flag sobrepõe apenas a sua chave):
+`%LOCALAPPDATA%/BuildGraph/config.json` no Windows e
+`${XDG_CONFIG_HOME:-~/.config}/buildgraph/config.json` no Linux. `BUILDGRAPH_CONFIG` (ou a
+propriedade `-Dbuildgraph.config`) aponta outro arquivo.
+
+```json
+{
+  "cacheDir": "D:/cache/buildgraph",
+  "cacheSize": "10G"
+}
+```
+
+Chaves ausentes mantêm o padrão; caminhos relativos partem da pasta do arquivo e `~` expande para
+o diretório do usuário. `cacheSize` aceita os mesmos sufixos das flags, bytes como número ou `0`
+para desativar o cache compartilhado. JSON inválido ou chave desconhecida torna o comando inválido
+com o caminho do arquivo na mensagem. `--help` mostra o caminho efetivo.
 O fluxo é incremental local → cache compartilhado → compilador → atualização do estado.
 `--no-incremental` força compilação real e pode alimentar o cache; `--no-cache` desativa somente o
 cache compartilhado. A primeira execução após uma atualização do schema incremental pode recompilar.

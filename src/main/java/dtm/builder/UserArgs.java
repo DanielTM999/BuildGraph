@@ -1,6 +1,7 @@
 package dtm.builder;
 
 import dtm.builder.build.BuildOptions;
+import dtm.builder.build.GlobalConfig;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -218,7 +219,8 @@ public final class UserArgs {
     }
 
     public BuildOptions getBuildOptions() {
-        var defaults = BuildOptions.defaults();
+        var defaults = argsMap.containsKey("--cache-dir") && argsMap.containsKey("--cache-size")
+                ? BuildOptions.builtin() : BuildOptions.defaults();
         return new BuildOptions(size("--memory-limit", 0), size("--memory-per-job", 0),
                 argsMap.containsKey("--cache-dir") ? Path.of(argsMap.get("--cache-dir")) : defaults.cacheDirectory(),
                 size("--cache-size", defaults.cacheSize()), !hasRelease() && !flag("--no-cache"), flag("--profile-build"), size("--memory-reserve", 0));
@@ -331,6 +333,14 @@ public final class UserArgs {
 
         if (!hasClean() && !hasBuild() && !hasInstall() && !hasTest() && !hasRefresh() && !hasLock() && !isInteractive() && !hasCompileCommands() && !hasVersion()) {
             argsMap.put(BUILD, "true");
+        }
+
+        if (!hasVersion() && !(argsMap.containsKey("--cache-dir") && argsMap.containsKey("--cache-size"))) {
+            try {
+                GlobalConfig.load();
+            } catch (IllegalArgumentException e) {
+                invalid(e.getMessage());
+            }
         }
     }
 
